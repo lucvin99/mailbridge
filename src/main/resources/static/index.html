@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — MailBridge</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .hero{background:linear-gradient(135deg,#eff6ff 0%,#fff 60%);border-bottom:1px solid var(--border);padding:48px 40px;display:flex;align-items:center;justify-content:space-between;gap:40px}
+  .hero h1{font-size:clamp(26px,4vw,40px);font-weight:600;line-height:1.2;letter-spacing:-.8px;margin-bottom:10px}
+  .hero h1 em{font-style:normal;color:var(--blue)}
+  .hero p{font-size:15px;color:var(--muted);line-height:1.65}
+  .quick{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .quick-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:22px;text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);transition:all .2s}
+  .quick-card:hover{border-color:var(--blue);box-shadow:0 4px 24px rgba(59,130,246,.12);transform:translateY(-2px)}
+  .quick-icon{width:40px;height:40px;background:var(--blue-light);border-radius:10px;display:flex;align-items:center;justify-content:center}
+  .quick-icon svg{width:20px;height:20px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .quick-title{font-size:15px;font-weight:600}
+  .quick-desc{font-size:13px;color:var(--muted);line-height:1.5}
+  .section-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<script src="auth.js"></script>
+<script>requireAuth();</script>
+
+<div class="hero">
+  <div>
+    <h1>Olá, <em id="hero-name">...</em> 👋</h1>
+    <p>Carrega uma lista, escolhe uma campanha<br>e envia emails personalizados em massa.</p>
+  </div>
+  <svg width="190" height="105" viewBox="0 0 220 120" fill="none" opacity=".85">
+    <rect x="10" y="85" width="200" height="8" rx="4" fill="#bfdbfe"/>
+    <rect x="38" y="35" width="10" height="58" rx="3" fill="#3b82f6"/>
+    <rect x="172" y="35" width="10" height="58" rx="3" fill="#3b82f6"/>
+    <line x1="43" y1="35" x2="110" y2="85" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+    <line x1="43" y1="35" x2="75"  y2="85" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+    <line x1="177" y1="35" x2="110" y2="85" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+    <line x1="177" y1="35" x2="145" y2="85" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+    <rect x="34" y="28" width="18" height="10" rx="3" fill="#1d4ed8"/>
+    <rect x="168" y="28" width="18" height="10" rx="3" fill="#1d4ed8"/>
+    <g transform="translate(95,6)"><rect width="30" height="22" rx="4" fill="#3b82f6"/><polyline points="0,0 15,13 30,0" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+  </svg>
+</div>
+
+<main>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
+      <div class="stat-label">Campanhas</div>
+      <div class="stat-number loading" id="s-campaigns">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
+      <div class="stat-label">Envios</div>
+      <div class="stat-number loading" id="s-deliveries">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="stat-label">Emails enviados</div>
+      <div class="stat-number loading" id="s-sent">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="stat-label">Falhados</div>
+      <div class="stat-number loading" id="s-failed">—</div>
+    </div>
+  </div>
+
+  <div class="section-label">O que queres fazer?</div>
+  <div class="quick">
+    <a class="quick-card" href="send.html">
+      <div class="quick-icon"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
+      <div class="quick-title">Enviar campanha</div>
+      <div class="quick-desc">Carrega um CSV ou Excel e envia emails personalizados para toda a lista.</div>
+    </a>
+    <a class="quick-card" href="campaigns.html">
+      <div class="quick-icon"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+      <div class="quick-title">Gerir campanhas</div>
+      <div class="quick-desc">Cria e edita os templates de email com variáveis como {{name}}.</div>
+    </a>
+    <a class="quick-card" href="history.html">
+      <div class="quick-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div class="quick-title">Histórico</div>
+      <div class="quick-desc">Consulta todos os envios anteriores e os seus resultados.</div>
+    </a>
+    <a class="quick-card" href="send.html">
+      <div class="quick-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <div class="quick-title">Importar lista</div>
+      <div class="quick-desc">Aceita ficheiros CSV e Excel com colunas email e name.</div>
+    </a>
+  </div>
+</main>
+
+<script src="nav.js"></script>
+<script>
+  renderNav('index');
+  const user = getUser();
+  if (user) document.getElementById('hero-name').textContent = user.name.split(' ')[0];
+
+  async function load() {
+    try {
+      const res = await apiFetch('/api/stats');
+      if (!res) return;
+      const s = await res.json();
+      set('s-campaigns',  s.totalCampaigns);
+      set('s-deliveries', s.totalDeliveries);
+      set('s-sent',       s.totalEmailsSent);
+      set('s-failed',     s.totalEmailsFailed);
+    } catch (e) { console.error(e); }
+  }
+
+  function set(id, val) {
+    const el = document.getElementById(id);
+    el.textContent = val;
+    el.classList.remove('loading');
+  }
+
+  load();
+</script>
+</body>
+</html>

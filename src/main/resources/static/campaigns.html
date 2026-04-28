@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campanhas — MailBridge</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="auth.js"></script>
+<script>requireAuth();</script>
+
+<div class="page-header">
+  <div class="page-title">Gerir <span>Campanhas</span></div>
+  <div class="count-badge" id="count-badge">0 campanhas</div>
+</div>
+
+<main>
+  <div class="card">
+    <div class="card-title">Nova campanha</div>
+    <div class="field"><label>Nome interno</label><input type="text" id="name" placeholder="Newsletter Maio 2025"></div>
+    <div class="field">
+      <label>Assunto do email</label>
+      <input type="text" id="subject" placeholder="Olá {{name}}, temos novidades!">
+      <div class="hint">Usa <code>{{name}}</code> para personalizar com o nome do destinatário.</div>
+    </div>
+    <div class="field">
+      <label>Corpo do email</label>
+      <textarea id="message" rows="6" placeholder="Olá {{name}},&#10;&#10;Escreve aqui a tua mensagem..."></textarea>
+      <div class="hint">Variáveis disponíveis: <code>{{name}}</code> <code>{{email}}</code></div>
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-primary" id="save-btn" onclick="save()">Criar campanha</button>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div>
+    <div class="list-header">
+      <div class="list-title">Campanhas existentes</div>
+    </div>
+    <div class="items" id="list"></div>
+  </div>
+</main>
+
+<script src="nav.js"></script>
+<script>
+  renderNav('campaigns');
+
+  async function load() {
+    try {
+      const res = await apiFetch('/api/campaigns');
+      const campaigns = await res.json();
+      document.getElementById('count-badge').textContent = campaigns.length + ' campanha' + (campaigns.length !== 1 ? 's' : '');
+      const list = document.getElementById('list');
+      if (!campaigns.length) { list.innerHTML = '<div class="empty">Ainda não há campanhas. Cria a primeira acima.</div>'; return; }
+      list.innerHTML = campaigns.map(c => `
+        <div class="item" style="align-items:flex-start" id="ci-${c.id}">
+          <div class="item-icon" style="margin-top:2px">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <div class="item-body">
+            <div class="item-title">${esc(c.name)}</div>
+            <div class="item-sub" style="font-family:'Figtree',sans-serif;color:var(--blue);font-weight:500">✉ ${esc(c.subject)}</div>
+            <div class="item-desc">${esc(c.message)}</div>
+          </div>
+          <div class="item-actions">
+            <a class="btn-send" href="send.html">Usar</a>
+            <button class="btn btn-danger" onclick="del(${c.id})">Eliminar</button>
+          </div>
+        </div>`).join('');
+    } catch { document.getElementById('list').innerHTML = '<div class="empty">Erro ao carregar.</div>'; }
+  }
+
+  async function save() {
+    const name    = document.getElementById('name').value.trim();
+    const subject = document.getElementById('subject').value.trim();
+    const message = document.getElementById('message').value.trim();
+    const btn = document.getElementById('save-btn');
+    if (!name || !subject || !message) { toast('toast', 'Preenche todos os campos', 'error'); return; }
+    btn.disabled = true; btn.textContent = '...';
+    try {
+      const res = await apiFetch('/api/campaigns', { method:'POST', body: JSON.stringify({name, subject, message}) });
+      const data = await res.json();
+      if (!res.ok) { toast('toast', data.error || 'Erro', 'error'); return; }
+      toast('toast', 'Campanha criada!', 'success');
+      document.getElementById('name').value = '';
+      document.getElementById('subject').value = '';
+      document.getElementById('message').value = '';
+      load();
+    } catch { toast('toast', 'Erro de ligação', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Criar campanha'; }
+  }
+
+  async function del(id) {
+    if (!confirm('Eliminar esta campanha?')) return;
+    try {
+      await apiFetch(`/api/campaigns/${id}`, { method:'DELETE' });
+      load();
+    } catch { toast('toast', 'Erro ao eliminar', 'error'); }
+  }
+
+  load();
+</script>
+</body>
+</html>

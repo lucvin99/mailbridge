@@ -1,0 +1,31 @@
+<configuration>
+    <!--
+        Logback — configuração de logging
+        Regista eventos em dois destinos:
+          1. CONSOLE — para ver em tempo real no terminal
+          2. FILE    — ficheiro permanente em logs/mailbridge.log
+    -->
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss} [%-5level] %logger{15} — %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/mailbridge.log</file>
+        <!-- Cria um novo ficheiro de log a cada dia, mantém os últimos 30 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/mailbridge.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%-5level] %logger{15} — %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registar — MailBridge</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="auth.js"></script>
+<script>redirectIfAuth();</script>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="10" fill="#eff6ff"/><rect x="4" y="22" width="28" height="3" rx="1.5" fill="#3b82f6"/><rect x="7" y="12" width="3" height="13" rx="1" fill="#1d4ed8"/><rect x="26" y="12" width="3" height="13" rx="1" fill="#1d4ed8"/><line x1="8.5" y1="12" x2="18" y2="22" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/><line x1="8.5" y1="12" x2="13" y2="22" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/><line x1="27.5" y1="12" x2="18" y2="22" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/><line x1="27.5" y1="12" x2="23" y2="22" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/><rect x="6.5" y="10" width="4" height="3" rx="1" fill="#1d4ed8"/><rect x="25.5" y="10" width="4" height="3" rx="1" fill="#1d4ed8"/></svg>
+      <span class="logo-text" style="font-size:22px">Mail<span style="color:var(--blue)">Bridge</span></span>
+    </div>
+    <div class="auth-title">Criar conta</div>
+    <div class="auth-sub">Começa a enviar campanhas em minutos</div>
+    <div class="field"><label>Nome</label><input type="text" id="name" placeholder="João Silva"></div>
+    <div class="field"><label>Email</label><input type="email" id="email" placeholder="joao@exemplo.pt"></div>
+    <div class="field"><label>Password</label><input type="password" id="password" placeholder="Mínimo 6 caracteres"></div>
+    <div class="toast" id="toast"></div>
+    <button class="btn btn-primary btn-full" id="btn" onclick="doRegister()">Criar conta</button>
+    <div class="auth-switch">Já tens conta? <a href="login.html">Entrar</a></div>
+  </div>
+</div>
+
+<script>
+  async function doRegister() {
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('btn');
+    if (!name || !email || !password) { toast('toast', 'Preenche todos os campos', 'error'); return; }
+    btn.disabled = true; btn.textContent = 'A criar...';
+    try {
+      const res = await fetch(API + '/api/auth/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast('toast', data.error, 'error'); return; }
+      saveSession(data);
+      window.location.href = 'index.html';
+    } catch { toast('toast', 'Erro de ligação ao servidor', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Criar conta'; }
+  }
+</script>
+</body>
+</html>

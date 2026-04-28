@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enviar — MailBridge</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .step{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .step-num{width:26px;height:26px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+  .step-label{font-size:14px;font-weight:600}
+  .preview-box{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--blue-dark);margin-top:12px;display:none}
+  .preview-count{font-weight:600;font-size:15px;margin-bottom:4px}
+  .confirm-section{display:none}
+</style>
+</head>
+<body>
+<script src="auth.js"></script>
+<script>requireAuth();</script>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Novo <span>Envio</span></div>
+  </div>
+</div>
+
+<main>
+  <!-- PASSO 1: carregar ficheiro -->
+  <div class="card">
+    <div class="step"><div class="step-num">1</div><div class="step-label">Carrega a lista de destinatários</div></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;margin-left:36px">Ficheiro CSV ou Excel com coluna <code style="background:var(--blue-light);padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace">email</code> obrigatória e <code style="background:var(--blue-light);padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace">name</code> opcional.</p>
+
+    <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p><strong>Clica para seleccionar</strong> ou arrasta aqui</p>
+      <p style="font-size:12px;margin-top:4px">CSV · XLS · XLSX</p>
+      <input type="file" id="file-input" accept=".csv,.xls,.xlsx" onchange="uploadFile(this.files[0])">
+    </div>
+
+    <div class="preview-box" id="preview-box">
+      <div class="preview-count" id="preview-count"></div>
+      <div id="preview-emails" style="color:var(--muted)"></div>
+    </div>
+    <div class="toast" id="toast-upload"></div>
+  </div>
+
+  <!-- PASSO 2: escolher campanha e enviar -->
+  <div class="card confirm-section" id="confirm-section">
+    <div class="step"><div class="step-num">2</div><div class="step-label">Escolhe a campanha e confirma o envio</div></div>
+    <div style="margin-left:36px;margin-top:16px">
+      <div class="field">
+        <label>Campanha</label>
+        <select id="campaign-select"><option value="">A carregar...</option></select>
+      </div>
+
+      <div id="campaign-preview" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:4px;font-size:13px">
+        <div style="font-weight:600;margin-bottom:4px">Assunto: <span id="cp-subject" style="font-weight:400;color:var(--muted)"></span></div>
+        <div style="color:var(--muted);line-height:1.5;white-space:pre-wrap" id="cp-body"></div>
+      </div>
+
+      <div class="toast" id="toast-send"></div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" id="send-btn" onclick="doSend()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Enviar agora
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="nav.js"></script>
+<script>
+  renderNav('send');
+
+  let currentFileKey = null;
+  let campaigns = [];
+
+  // Drag & drop
+  const zone = document.getElementById('drop-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); uploadFile(e.dataTransfer.files[0]); });
+
+  async function uploadFile(file) {
+    if (!file) return;
+    toast('toast-upload', 'A processar ficheiro...', 'info');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = getToken();
+      const res = await fetch(API + '/api/deliveries/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) { toast('toast-upload', data.error || 'Erro', 'error'); return; }
+
+      currentFileKey = data.fileKey;
+
+      // Mostra preview
+      document.getElementById('preview-count').textContent = data.count + ' destinatário' + (data.count !== 1 ? 's' : '') + ' encontrado' + (data.count !== 1 ? 's' : '');
+      document.getElementById('preview-emails').textContent = data.preview;
+      document.getElementById('preview-box').style.display = 'block';
+      document.getElementById('toast-upload').style.display = 'none';
+
+      // Mostra passo 2
+      document.getElementById('confirm-section').style.display = 'block';
+      loadCampaigns();
+
+    } catch { toast('toast-upload', 'Erro de ligação ao servidor', 'error'); }
+    finally { document.getElementById('file-input').value = ''; }
+  }
+
+  async function loadCampaigns() {
+    try {
+      const res = await apiFetch('/api/campaigns');
+      campaigns = await res.json();
+      const sel = document.getElementById('campaign-select');
+      if (!campaigns.length) {
+        sel.innerHTML = '<option value="">Nenhuma campanha — cria uma primeiro</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">Selecciona uma campanha...</option>' +
+        campaigns.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      sel.onchange = showCampaignPreview;
+    } catch { document.getElementById('campaign-select').innerHTML = '<option>Erro ao carregar</option>'; }
+  }
+
+  function showCampaignPreview() {
+    const id = parseInt(document.getElementById('campaign-select').value);
+    const c = campaigns.find(x => x.id === id);
+    const preview = document.getElementById('campaign-preview');
+    if (!c) { preview.style.display = 'none'; return; }
+    document.getElementById('cp-subject').textContent = c.subject;
+    document.getElementById('cp-body').textContent = c.message.slice(0, 200) + (c.message.length > 200 ? '...' : '');
+    preview.style.display = 'block';
+  }
+
+  async function doSend() {
+    const campaignId = parseInt(document.getElementById('campaign-select').value);
+    if (!campaignId) { toast('toast-send', 'Selecciona uma campanha', 'error'); return; }
+    if (!currentFileKey) { toast('toast-send', 'Carrega o ficheiro primeiro', 'error'); return; }
+
+    const c = campaigns.find(x => x.id === campaignId);
+    const count = document.getElementById('preview-count').textContent;
+    if (!confirm(`Enviar "${c?.name}" para ${count}?`)) return;
+
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true; btn.textContent = 'A iniciar...';
+    toast('toast-send', 'A iniciar envio...', 'info');
+
+    try {
+      const res = await apiFetch('/api/deliveries', {
+        method: 'POST',
+        body: JSON.stringify({ campaignId, fileKey: currentFileKey })
+      });
+      const data = await res.json();
+      if (!res.ok) { toast('toast-send', data.error || 'Erro', 'error'); return; }
+
+      toast('toast-send', 'Envio iniciado! A redirigir para o histórico...', 'success');
+      currentFileKey = null;
+      setTimeout(() => window.location.href = 'history.html', 1800);
+
+    } catch { toast('toast-send', 'Erro de ligação ao servidor', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Enviar agora'; }
+  }
+</script>
+</body>
+</html>

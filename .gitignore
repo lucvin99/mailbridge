@@ -1,0 +1,5 @@
+target/
+*.class
+*.jar
+logs/
+src/main/resources/db.properties

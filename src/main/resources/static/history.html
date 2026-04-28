@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Histórico — MailBridge</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<script src="auth.js"></script>
+<script>requireAuth();</script>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Histórico de <span>Envios</span></div>
+  </div>
+</div>
+
+<main>
+  <div id="list"></div>
+</main>
+
+<script src="nav.js"></script>
+<script>
+  renderNav('history');
+  let pollInterval = null;
+
+  function statusLabel(s) {
+    return { pending:'A aguardar', running:'A enviar', done:'Concluído', error:'Com erros' }[s] || s;
+  }
+
+  function iconSvg(s) {
+    if (s === 'done')    return '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+    if (s === 'running') return '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+    if (s === 'error')   return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  }
+
+  function renderDelivery(d) {
+    const pct = d.totalContacts > 0
+      ? Math.round(((d.sent + d.failed) / d.totalContacts) * 100) : 0;
+    return `
+      <div class="d-item ${d.status}">
+        <div class="d-top">
+          <div class="d-left">
+            <div class="d-icon ${d.status}">${iconSvg(d.status)}</div>
+            <div>
+              <div class="d-name">${esc(d.campaignName || 'Campanha #' + d.campaignId)}</div>
+              <div class="d-meta">${(d.createdAt || '').replace('T',' ').slice(0,16)} · ID #${d.id}</div>
+            </div>
+          </div>
+          <span class="badge ${d.status}">${statusLabel(d.status)}</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-labels">
+            <span>${d.sent + d.failed} de ${d.totalContacts} processados</span>
+            <strong>${pct}%</strong>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill ${d.status}" style="width:${pct}%"></div>
+          </div>
+        </div>
+        <div class="d-stats">
+          <div><div class="d-stat-label">Total</div><div class="d-stat-val">${d.totalContacts}</div></div>
+          <div><div class="d-stat-label">Enviados</div><div class="d-stat-val s">${d.sent}</div></div>
+          <div><div class="d-stat-label">Falhados</div><div class="d-stat-val f">${d.failed}</div></div>
+        </div>
+      </div>`;
+  }
+
+  async function load() {
+    try {
+      const res = await apiFetch('/api/deliveries');
+      if (!res) return;
+      const deliveries = await res.json();
+      const list = document.getElementById('list');
+      if (!deliveries.length) {
+        list.innerHTML = '<div class="empty">Ainda não há envios. <a href="send.html" style="color:var(--blue)">Inicia o primeiro →</a></div>';
+        return;
+      }
+      list.innerHTML = deliveries.map(renderDelivery).join('');
+      const running = deliveries.some(d => d.status === 'running' || d.status === 'pending');
+      if (running) startPolling(); else stopPolling();
+    } catch (e) {
+      document.getElementById('list').innerHTML = '<div class="empty">Erro ao carregar envios.</div>';
+    }
+  }
+
+  function startPolling() { if (!pollInterval) pollInterval = setInterval(load, 2000); }
+  function stopPolling()  { if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } }
+
+  load();
+</script>
+</body>
+</html>
