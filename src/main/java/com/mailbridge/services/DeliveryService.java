@@ -22,16 +22,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * Serviço de envios — núcleo da aplicação.
  *
  * Fluxo completo de um envio:
- *   1. Utilizador carrega ficheiro → previewFile() devolve fileKey + contagem
+ *   1. Utilizador carrega ficheiro → storeFile() guarda em memória e devolve fileKey
  *   2. Utilizador escolhe campanha e confirma → startDelivery() inicia o envio
- *   3. O envio corre numa thread separada (virtual thread do Java 21)
+ *   3. O envio corre numa thread separada para não bloquear o servidor
  *   4. A cada email enviado, o progresso é guardado na BD
  *   5. O frontend faz polling a /api/deliveries/:id para mostrar o progresso
- *
- * Porquê thread separada?
- *   Enviar 1000 emails demora minutos. Se corresse na thread do HTTP request,
- *   o browser ficaria à espera e o pedido faria timeout. Com thread separada,
- *   o servidor responde imediatamente com o deliveryId e o envio continua em fundo.
  *
  * Porquê fileStore em memória?
  *   Os destinatários não são persistidos na BD — são temporários.
@@ -60,6 +55,7 @@ public class DeliveryService {
     /**
      * Processa o ficheiro carregado e guarda os destinatários em memória.
      * Devolve uma fileKey que o frontend usa para referenciar a lista no envio.
+     * O ficheiro é guardado apenas UMA vez — bug anterior criava duas entradas.
      */
     public String storeFile(byte[] data, String fileName) {
         List<Recipient> recipients;
@@ -79,7 +75,6 @@ public class DeliveryService {
             throw new ValidationException("Nenhum destinatário válido encontrado no ficheiro.");
         }
 
-        // Gera chave única para este ficheiro
         String fileKey = UUID.randomUUID().toString();
         fileStore.put(fileKey, recipients);
 
@@ -87,7 +82,7 @@ public class DeliveryService {
         return fileKey;
     }
 
-    /** Devolve os destinatários associados a uma fileKey */
+    /** Devolve os destinatários associados a uma fileKey sem os remover */
     public List<Recipient> getRecipients(String fileKey) {
         return fileStore.get(fileKey);
     }
@@ -97,20 +92,18 @@ public class DeliveryService {
      * Valida tudo antes de criar o registo e iniciar a thread.
      */
     public int startDelivery(int campaignId, String fileKey, int userId) throws SQLException {
-        // Verifica configuração de email primeiro — erro rápido
         emailService.assertConfigured();
 
         Campaign campaign = campaignRepo.findById(campaignId, userId);
         if (campaign == null) throw new NotFoundException("Campanha não encontrada");
 
-        List<Recipient> recipients = fileStore.remove(fileKey); // remove da memória após usar
+        // Remove da memória após usar — cada fileKey é de uso único
+        List<Recipient> recipients = fileStore.remove(fileKey);
         if (recipients == null || recipients.isEmpty())
             throw new ValidationException("Ficheiro não encontrado ou já utilizado. Faz upload novamente.");
 
-        // Cria registo na BD com status 'pending'
         int deliveryId = deliveryRepo.create(userId, campaignId, recipients.size());
 
-        // Inicia envio em thread virtual (Java 17+ com Project Loom preview, ou adapta para Thread normal)
         final Campaign finalCampaign = campaign;
         final List<Recipient> finalRecipients = recipients;
         new Thread(() -> sendEmails(deliveryId, finalCampaign, finalRecipients)).start();
@@ -135,7 +128,6 @@ public class DeliveryService {
 
         for (Recipient recipient : recipients) {
             try {
-                // Personalização: substitui variáveis no assunto e corpo
                 String subject = personalize(campaign.getSubject(), recipient);
                 String body    = personalize(campaign.getMessage(), recipient);
 
@@ -143,7 +135,6 @@ public class DeliveryService {
                 sent++;
                 logger.info("[Delivery #{}] ✓ Enviado → {}", deliveryId, recipient.getEmail());
 
-                // Pausa entre envios — Gmail limita a ~500 emails/dia em contas normais
                 Thread.sleep(300);
 
             } catch (InterruptedException e) {
@@ -155,7 +146,6 @@ public class DeliveryService {
                 logger.warn("[Delivery #{}] ✗ Falhou → {} — {}", deliveryId, recipient.getEmail(), e.getMessage());
             }
 
-            // Actualiza progresso na BD após cada email
             try {
                 deliveryRepo.updateProgress(deliveryId, sent, failed, "running");
             } catch (SQLException e) {
@@ -163,9 +153,7 @@ public class DeliveryService {
             }
         }
 
-        // Marca como concluído
         try {
-            // "error" apenas se TODOS falharam; caso contrário "done"
             String finalStatus = (failed == recipients.size()) ? "error" : "done";
             deliveryRepo.updateProgress(deliveryId, sent, failed, finalStatus);
             logger.info("[Delivery #{}] Concluído — ✓ {} enviados, ✗ {} falhados", deliveryId, sent, failed);
@@ -176,12 +164,18 @@ public class DeliveryService {
 
     /**
      * Substitui variáveis no template pelo valor real do destinatário.
-     * Variáveis suportadas: {{name}}, {{email}}
+     * Suporta {{name}}, {{email}} e qualquer coluna extra do ficheiro.
      */
     private String personalize(String template, Recipient r) {
-        return template
+        String result = template
                 .replace("{{name}}",  r.getName())
                 .replace("{{email}}", r.getEmail());
+
+        // Substitui todas as variáveis dinâmicas das colunas extra do ficheiro
+        for (Map.Entry<String, String> entry : r.getFields().entrySet()) {
+            result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
+        }
+        return result;
     }
 
     public List<Delivery> getAll(int userId) throws SQLException {

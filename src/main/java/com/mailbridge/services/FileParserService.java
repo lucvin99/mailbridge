@@ -15,7 +15,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Serviço de leitura de ficheiros CSV e Excel.
@@ -26,8 +28,8 @@ import java.util.List;
  * Regras de leitura:
  *   - Coluna 'email' (ou 'e-mail') é obrigatória
  *   - Coluna 'name' (ou 'nome') é opcional
+ *   - Todas as outras colunas são lidas como campos dinâmicos ({{coluna}})
  *   - Linhas com email inválido são ignoradas e registadas no log
- *   - Colunas extra são ignoradas silenciosamente
  */
 public class FileParserService {
     private static final Logger logger = LoggerFactory.getLogger(FileParserService.class);
@@ -61,7 +63,25 @@ public class FileParserService {
                     continue;
                 }
                 String name = getField(record, "name", "nome");
-                recipients.add(new Recipient(name != null ? name : emailToName(email), email.toLowerCase()));
+
+                // Lê todas as colunas extra como campos dinâmicos
+                Map<String, String> fields = new HashMap<>();
+                for (String header : parser.getHeaderNames()) {
+                    String key = header.toLowerCase().trim();
+                    // Ignora as colunas base — já estão em name e email
+                    if (key.equals("email") || key.equals("e-mail")
+                            || key.equals("name") || key.equals("nome")) continue;
+                    try {
+                        String val = record.get(header);
+                        if (val != null && !val.isBlank()) fields.put(key, val.trim());
+                    } catch (Exception ignored) {}
+                }
+
+                recipients.add(new Recipient(
+                        name != null ? name : emailToName(email),
+                        email.toLowerCase(),
+                        fields
+                ));
             }
 
         } catch (Exception e) {
@@ -78,7 +98,7 @@ public class FileParserService {
                 ? new XSSFWorkbook(new ByteArrayInputStream(data))
                 : new HSSFWorkbook(new ByteArrayInputStream(data))) {
 
-            Sheet sheet = workbook.getSheetAt(0); // Usa sempre a primeira folha
+            Sheet sheet = workbook.getSheetAt(0);
             Row header = sheet.getRow(0);
             if (header == null) {
                 logger.warn("Excel vazio ou sem cabeçalho");
@@ -87,10 +107,20 @@ public class FileParserService {
 
             // Detecta as colunas pelo nome do cabeçalho
             int emailCol = -1, nameCol = -1;
+            // Mapa: índice de coluna → nome da coluna (para campos dinâmicos)
+            Map<Integer, String> extraCols = new HashMap<>();
+
             for (Cell cell : header) {
                 String val = cell.getStringCellValue().toLowerCase().trim();
-                if (val.equals("email") || val.equals("e-mail")) emailCol = cell.getColumnIndex();
-                if (val.equals("name")  || val.equals("nome"))   nameCol  = cell.getColumnIndex();
+                int idx = cell.getColumnIndex();
+                if (val.equals("email") || val.equals("e-mail")) {
+                    emailCol = idx;
+                } else if (val.equals("name") || val.equals("nome")) {
+                    nameCol = idx;
+                } else if (!val.isBlank()) {
+                    // Regista coluna extra como campo dinâmico
+                    extraCols.put(idx, val);
+                }
             }
 
             if (emailCol == -1) {
@@ -113,9 +143,20 @@ public class FileParserService {
                         ? formatter.formatCellValue(row.getCell(nameCol)).trim()
                         : null;
 
+                // Lê todos os campos dinâmicos desta linha
+                Map<String, String> fields = new HashMap<>();
+                for (Map.Entry<Integer, String> entry : extraCols.entrySet()) {
+                    Cell cell = row.getCell(entry.getKey());
+                    if (cell != null) {
+                        String val = formatter.formatCellValue(cell).trim();
+                        if (!val.isBlank()) fields.put(entry.getValue(), val);
+                    }
+                }
+
                 recipients.add(new Recipient(
                         (name != null && !name.isBlank()) ? name : emailToName(email),
-                        email.toLowerCase()
+                        email.toLowerCase(),
+                        fields
                 ));
             }
 

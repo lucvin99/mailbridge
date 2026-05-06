@@ -1,5 +1,8 @@
 package com.mailbridge.dto;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * DTO (Data Transfer Object) — objectos usados para transportar dados
  * entre o frontend (HTTP) e a camada de serviços.
@@ -9,7 +12,6 @@ package com.mailbridge.dto;
  *   - Evitam expor campos internos (ex: passwordHash, userId)
  *   - Permitem validar antes de criar o modelo de domínio
  */
-
 public class DTOs {
 
     /** Dados necessários para criar uma conta */
@@ -46,7 +48,7 @@ public class DTOs {
     /** Pedido de início de envio — liga uma campanha a um ficheiro já carregado */
     public static class DeliveryRequest {
         public int    campaignId;
-        public String fileKey;  // chave temporária do ficheiro carregado em memória
+        public String fileKey;
     }
 
     /** Estatísticas do dashboard */
@@ -65,14 +67,40 @@ public class DTOs {
         }
     }
 
-    /** Resposta após importação de ficheiro */
+    /**
+     * Resposta após importação de ficheiro.
+     * Inclui variáveis detectadas e primeiro destinatário para pré-visualização.
+     */
     public static class ImportResponse {
-        public String fileKey;     // identificador temporário para usar no envio
-        public int    count;       // número de destinatários válidos encontrados
-        public String preview;     // primeiros emails para o utilizador confirmar
+        public String       fileKey;         // chave para usar no envio
+        public int          count;           // total de destinatários válidos
+        public String       preview;         // primeiros emails resumidos
+        public List<String> vars;            // variáveis dinâmicas detectadas (colunas extra)
+        public FirstRecipient firstRecipient; // primeiro destinatário para pré-visualização
 
-        public ImportResponse(String fileKey, int count, String preview) {
-            this.fileKey = fileKey; this.count = count; this.preview = preview;
+        public ImportResponse(String fileKey, int count, String preview,
+                              List<String> vars, FirstRecipient firstRecipient) {
+            this.fileKey        = fileKey;
+            this.count          = count;
+            this.preview        = preview;
+            this.vars           = vars;
+            this.firstRecipient = firstRecipient;
+        }
+    }
+
+    /**
+     * Dados do primeiro destinatário usados para pré-visualização do email
+     * antes de confirmar o envio.
+     */
+    public static class FirstRecipient {
+        public String name;
+        public String email;
+        public Map<String, String> fields;
+
+        public FirstRecipient(String name, String email, Map<String, String> fields) {
+            this.name   = name;
+            this.email  = email;
+            this.fields = fields;
         }
     }
 

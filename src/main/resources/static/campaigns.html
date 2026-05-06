@@ -21,12 +21,18 @@
     <div class="field"><label>Nome interno</label><input type="text" id="name" placeholder="Newsletter Maio 2025"></div>
     <div class="field">
       <label>Assunto do email</label>
-      <input type="text" id="subject" placeholder="Olá {{name}}, temos novidades!">
+    <div style="position:relative">
+      <input type="text" id="subject" placeholder="Olá {{name}}, temos novidades!" oninput="checkSlashInput(event)">
+      <div id="var-dropdown-subject" style="display:none;position:absolute;background:white;border:1.5px solid var(--blue-mid);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;min-width:200px;overflow:hidden"></div>
+    </div>
       <div class="hint">Usa <code>{{name}}</code> para personalizar com o nome do destinatário.</div>
     </div>
     <div class="field">
       <label>Corpo do email</label>
-      <textarea id="message" rows="6" placeholder="Olá {{name}},&#10;&#10;Escreve aqui a tua mensagem..."></textarea>
+      <div style="position:relative">
+        <textarea id="message" rows="6" placeholder="Olá {{name}},&#10;&#10;Escreve aqui a tua mensagem..." oninput="checkSlash(event)"></textarea>
+        <div id="var-dropdown" style="display:none;position:absolute;background:white;border:1.5px solid var(--blue-mid);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;min-width:200px;overflow:hidden"></div>
+      </div>
       <div class="hint">Variáveis disponíveis: <code>{{name}}</code> <code>{{email}}</code></div>
     </div>
     <div class="form-footer">
@@ -99,6 +105,76 @@
       load();
     } catch { toast('toast', 'Erro ao eliminar', 'error'); }
   }
+
+  // Variáveis base sempre disponíveis
+  const baseVars = ['name', 'email'];
+  // Variáveis dinâmicas do último ficheiro carregado (partilhadas via localStorage)
+  let dynamicVars = [];
+
+  try {
+    const saved = localStorage.getItem('mb_last_vars');
+    if (saved) dynamicVars = JSON.parse(saved);
+  } catch(e) {}
+
+  function checkSlash(e) {
+    const ta = document.getElementById('message');
+    const val = ta.value;
+    const pos = ta.selectionStart;
+    
+    // Detecta se o último caracter escrito foi /
+    if (val[pos-1] !== '/') {
+      document.getElementById('var-dropdown').style.display = 'none';
+      return;
+    }
+
+    // Filtra variáveis com o texto após /
+    showVarDropdown(ta, pos);
+  }
+
+  function showVarDropdown(ta, pos) {
+    const allVars = [...new Set([...baseVars, ...dynamicVars])];
+    const dropdown = document.getElementById('var-dropdown');
+    
+    dropdown.innerHTML = allVars.map(v => `
+      <div onclick="insertVar('${v}')" style="padding:8px 14px;cursor:pointer;font-size:13px;font-family:'JetBrains Mono',monospace;transition:background .1s" 
+          onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
+        {{${v}}}
+      </div>
+    `).join('') + `
+      <div style="border-top:1px solid #e2e8f0;padding:8px 14px;cursor:pointer;font-size:12px;color:var(--muted)" 
+          onclick="insertCustomVar()" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+        + variável personalizada
+      </div>
+    `;
+    
+    // Posiciona o dropdown abaixo do cursor
+    dropdown.style.display = 'block';
+    dropdown.style.top = '100%';
+    dropdown.style.left = '14px';
+  }
+
+  function insertVar(varName) {
+    const ta = document.getElementById('message');
+    const pos = ta.selectionStart;
+    const val = ta.value;
+    // Remove o / e insere {{varName}}
+    ta.value = val.slice(0, pos-1) + '{{' + varName + '}}' + val.slice(pos);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = pos - 1 + varName.length + 4;
+    document.getElementById('var-dropdown').style.display = 'none';
+  }
+
+  function insertCustomVar() {
+    const name = prompt('Nome da variável (ex: empresa):');
+    if (name && name.trim()) insertVar(name.trim().toLowerCase());
+  }
+
+  // Fecha dropdown ao clicar fora
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#var-dropdown') && e.target.id !== 'message') {
+      document.getElementById('var-dropdown').style.display = 'none';
+    }
+  });
 
   load();
 </script>

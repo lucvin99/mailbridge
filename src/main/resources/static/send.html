@@ -6,12 +6,23 @@
 <title>Enviar — MailBridge</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  .step{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-  .step-num{width:26px;height:26px;background:var(--blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
-  .step-label{font-size:14px;font-weight:600}
-  .preview-box{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--blue-dark);margin-top:12px;display:none}
-  .preview-count{font-weight:600;font-size:15px;margin-bottom:4px}
-  .confirm-section{display:none}
+  .step-row{display:flex;gap:20px;align-items:flex-start}
+  .step-box{flex:1;background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);transition:border-color .2s,opacity .2s}
+  .step-box.locked{opacity:.5;pointer-events:none}
+  .step-box.active{border-color:var(--blue)}
+  .step-box.done{border-color:#bbf7d0}
+  .step-num{width:26px;height:26px;background:var(--border);color:var(--muted);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-bottom:10px;transition:all .2s}
+  .step-box.active .step-num{background:var(--blue);color:white}
+  .step-box.done .step-num{background:var(--green);color:white}
+  .step-title{font-size:14px;font-weight:600;margin-bottom:3px}
+  .step-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .arrow{font-size:24px;color:var(--border);margin-top:52px;flex-shrink:0}
+  .preview-box{background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--blue-dark);margin-bottom:14px;display:none}
+  .var-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .var-tag{font-family:'JetBrains Mono',monospace;font-size:11px;background:white;border:1px solid var(--blue-mid);color:var(--blue-dark);padding:2px 8px;border-radius:6px;cursor:pointer;transition:all .15s;user-select:none}
+  .var-tag:hover{background:var(--blue);color:white;border-color:var(--blue)}
+  .email-preview{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:13px;line-height:1.6;margin-top:10px;display:none;max-height:180px;overflow-y:auto;white-space:pre-wrap}
+  .preview-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -19,53 +30,72 @@
 <script>requireAuth();</script>
 
 <div class="page-header">
-  <div>
-    <div class="page-title">Novo <span>Envio</span></div>
-  </div>
+  <div class="page-title">Novo <span>Envio</span></div>
 </div>
 
-<main>
-  <!-- PASSO 1: carregar ficheiro -->
-  <div class="card">
-    <div class="step"><div class="step-num">1</div><div class="step-label">Carrega a lista de destinatários</div></div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;margin-left:36px">Ficheiro CSV ou Excel com coluna <code style="background:var(--blue-light);padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace">email</code> obrigatória e <code style="background:var(--blue-light);padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace">name</code> opcional.</p>
+<main style="max-width:1100px">
+  <div class="step-row">
 
-    <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <p><strong>Clica para seleccionar</strong> ou arrasta aqui</p>
-      <p style="font-size:12px;margin-top:4px">CSV · XLS · XLSX</p>
-      <input type="file" id="file-input" accept=".csv,.xls,.xlsx" onchange="uploadFile(this.files[0])">
+    <!-- PASSO 1: Upload -->
+    <div class="step-box active" id="box-1">
+      <div class="step-num">1</div>
+      <div class="step-title">Lista de destinatários</div>
+      <div class="step-sub">CSV ou Excel — coluna <code style="background:var(--blue-light);padding:1px 5px;border-radius:4px;font-size:10px;font-family:monospace">email</code> obrigatória</div>
+
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Clica</strong> ou arrasta aqui</p>
+        <p style="font-size:11px;margin-top:2px">CSV · XLS · XLSX</p>
+        <input type="file" id="file-input" accept=".csv,.xls,.xlsx" onchange="uploadFile(this.files[0])">
+      </div>
+
+      <div class="preview-box" id="preview-box">
+        <div style="font-weight:600;font-size:14px;margin-bottom:3px" id="preview-count"></div>
+        <div style="color:var(--muted);font-size:12px" id="preview-emails"></div>
+        <div id="var-wrap" style="display:none;margin-top:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px">VARIÁVEIS — clica para copiar</div>
+          <div class="var-tags" id="var-tags"></div>
+        </div>
+      </div>
+      <div class="toast" id="toast-upload"></div>
     </div>
 
-    <div class="preview-box" id="preview-box">
-      <div class="preview-count" id="preview-count"></div>
-      <div id="preview-emails" style="color:var(--muted)"></div>
-    </div>
-    <div class="toast" id="toast-upload"></div>
-  </div>
+    <div class="arrow">→</div>
 
-  <!-- PASSO 2: escolher campanha e enviar -->
-  <div class="card confirm-section" id="confirm-section">
-    <div class="step"><div class="step-num">2</div><div class="step-label">Escolhe a campanha e confirma o envio</div></div>
-    <div style="margin-left:36px;margin-top:16px">
+    <!-- PASSO 2: Campanha -->
+    <div class="step-box locked" id="box-2">
+      <div class="step-num">2</div>
+      <div class="step-title">Campanha</div>
+      <div class="step-sub">Escolhe o template a enviar</div>
       <div class="field">
-        <label>Campanha</label>
-        <select id="campaign-select"><option value="">A carregar...</option></select>
+        <select id="campaign-select" onchange="showPreview()">
+          <option value="">Selecciona uma campanha...</option>
+        </select>
       </div>
-
-      <div id="campaign-preview" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:4px;font-size:13px">
-        <div style="font-weight:600;margin-bottom:4px">Assunto: <span id="cp-subject" style="font-weight:400;color:var(--muted)"></span></div>
-        <div style="color:var(--muted);line-height:1.5;white-space:pre-wrap" id="cp-body"></div>
-      </div>
-
-      <div class="toast" id="toast-send"></div>
-      <div style="margin-top:16px">
-        <button class="btn btn-primary" id="send-btn" onclick="doSend()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          Enviar agora
-        </button>
+      <div id="preview-wrap" style="display:none">
+        <div class="preview-label">Pré-visualização — 1.º destinatário</div>
+        <div style="font-size:13px;margin-bottom:4px"><strong>Assunto:</strong> <span id="cp-subject" style="color:var(--muted)"></span></div>
+        <div class="email-preview" id="email-preview"></div>
       </div>
     </div>
+
+    <div class="arrow">→</div>
+
+    <!-- PASSO 3: Enviar -->
+    <div class="step-box locked" id="box-3">
+      <div class="step-num">3</div>
+      <div class="step-title">Confirmar e enviar</div>
+      <div class="step-sub">Revê e envia para toda a lista</div>
+      <div id="send-summary" style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+        Completa os passos anteriores.
+      </div>
+      <button class="btn btn-primary" id="send-btn" onclick="doSend()" disabled style="width:100%;justify-content:center">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Enviar agora
+      </button>
+      <div class="toast" id="toast-send"></div>
+    </div>
+
   </div>
 </main>
 
@@ -74,9 +104,10 @@
   renderNav('send');
 
   let currentFileKey = null;
-  let campaigns = [];
+  let campaigns      = [];
+  let firstRecipient = null;
+  let detectedVars   = [];
 
-  // Drag & drop
   const zone = document.getElementById('drop-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
@@ -85,88 +116,103 @@
   async function uploadFile(file) {
     if (!file) return;
     toast('toast-upload', 'A processar ficheiro...', 'info');
-
     const formData = new FormData();
     formData.append('file', file);
-
     try {
-      const token = getToken();
       const res = await fetch(API + '/api/deliveries/upload', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token },
-        body: formData
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: formData
       });
       const data = await res.json();
-      if (!res.ok) { toast('toast-upload', data.error || 'Erro', 'error'); return; }
+      if (!res.ok) { toast('toast-upload', data.error || 'Erro ao processar', 'error'); return; }
 
       currentFileKey = data.fileKey;
+      firstRecipient = data.firstRecipient;
+      detectedVars   = data.vars || [];
+      localStorage.setItem('mb_last_vars', JSON.stringify(detectedVars));
 
-      // Mostra preview
-      document.getElementById('preview-count').textContent = data.count + ' destinatário' + (data.count !== 1 ? 's' : '') + ' encontrado' + (data.count !== 1 ? 's' : '');
+      const count = data.count;
+      document.getElementById('preview-count').textContent = count + ' destinatário' + (count !== 1 ? 's' : '') + ' encontrado' + (count !== 1 ? 's' : '');
       document.getElementById('preview-emails').textContent = data.preview;
       document.getElementById('preview-box').style.display = 'block';
       document.getElementById('toast-upload').style.display = 'none';
 
-      // Mostra passo 2
-      document.getElementById('confirm-section').style.display = 'block';
-      loadCampaigns();
+      const allVars = ['name', 'email', ...detectedVars];
+      document.getElementById('var-tags').innerHTML = allVars.map(v =>
+        '<span class="var-tag" onclick="copyVar(this)"  data-var="{{' + v + '}}">{{' + v + '}}</span>'
+      ).join('');
+      document.getElementById('var-wrap').style.display = 'block';
 
+      document.getElementById('box-1').classList.replace('active','done');
+      document.getElementById('box-2').classList.remove('locked');
+      document.getElementById('box-2').classList.add('active');
+      await loadCampaigns();
     } catch { toast('toast-upload', 'Erro de ligação ao servidor', 'error'); }
     finally { document.getElementById('file-input').value = ''; }
+  }
+
+  function copyVar(el) {
+    const text = el.getAttribute('data-var');
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = el.textContent; el.textContent = 'copiado';
+      setTimeout(() => el.textContent = orig, 1400);
+    });
   }
 
   async function loadCampaigns() {
     try {
       const res = await apiFetch('/api/campaigns');
+      if (!res) return;
       campaigns = await res.json();
       const sel = document.getElementById('campaign-select');
-      if (!campaigns.length) {
-        sel.innerHTML = '<option value="">Nenhuma campanha — cria uma primeiro</option>';
-        return;
-      }
+      if (!campaigns.length) { sel.innerHTML = '<option value="">Sem campanhas — cria uma primeiro</option>'; return; }
       sel.innerHTML = '<option value="">Selecciona uma campanha...</option>' +
-        campaigns.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-      sel.onchange = showCampaignPreview;
-    } catch { document.getElementById('campaign-select').innerHTML = '<option>Erro ao carregar</option>'; }
+        campaigns.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+    } catch {}
   }
 
-  function showCampaignPreview() {
+  function showPreview() {
     const id = parseInt(document.getElementById('campaign-select').value);
-    const c = campaigns.find(x => x.id === id);
-    const preview = document.getElementById('campaign-preview');
-    if (!c) { preview.style.display = 'none'; return; }
-    document.getElementById('cp-subject').textContent = c.subject;
-    document.getElementById('cp-body').textContent = c.message.slice(0, 200) + (c.message.length > 200 ? '...' : '');
-    preview.style.display = 'block';
+    const c  = campaigns.find(x => x.id === id);
+    const sendBtn = document.getElementById('send-btn');
+    if (!c) { sendBtn.disabled = true; return; }
+
+    let subject = c.subject, body = c.message;
+    if (firstRecipient) { subject = applyVars(subject, firstRecipient); body = applyVars(body, firstRecipient); }
+
+    document.getElementById('cp-subject').textContent = subject;
+    const prev = document.getElementById('email-preview');
+    prev.textContent = body; prev.style.display = 'block';
+    document.getElementById('preview-wrap').style.display = 'block';
+    document.getElementById('box-2').classList.add('done');
+    document.getElementById('box-3').classList.remove('locked');
+    document.getElementById('box-3').classList.add('active');
+    document.getElementById('send-summary').innerHTML = '<strong>' + esc(c.name) + '</strong><br><span style="color:var(--muted)">' + document.getElementById('preview-count').textContent + '</span>';
+    sendBtn.disabled = false;
+  }
+
+  function applyVars(text, r) {
+    let result = text.replace(/\{\{name\}\}/g, r.name||'').replace(/\{\{email\}\}/g, r.email||'');
+    if (r.fields) for (const [k,v] of Object.entries(r.fields)) result = result.replace(new RegExp('\\{\\{'+k+'\\}\\}','g'), v);
+    return result;
   }
 
   async function doSend() {
     const campaignId = parseInt(document.getElementById('campaign-select').value);
-    if (!campaignId) { toast('toast-send', 'Selecciona uma campanha', 'error'); return; }
-    if (!currentFileKey) { toast('toast-send', 'Carrega o ficheiro primeiro', 'error'); return; }
-
+    if (!campaignId || !currentFileKey) return;
     const c = campaigns.find(x => x.id === campaignId);
-    const count = document.getElementById('preview-count').textContent;
-    if (!confirm(`Enviar "${c?.name}" para ${count}?`)) return;
-
+    if (!confirm('Enviar "' + (c?c.name:'') + '" para ' + document.getElementById('preview-count').textContent + '?')) return;
     const btn = document.getElementById('send-btn');
-    btn.disabled = true; btn.textContent = 'A iniciar...';
+    btn.disabled = true; btn.textContent = 'A enviar...';
     toast('toast-send', 'A iniciar envio...', 'info');
-
     try {
-      const res = await apiFetch('/api/deliveries', {
-        method: 'POST',
-        body: JSON.stringify({ campaignId, fileKey: currentFileKey })
-      });
+      const res = await apiFetch('/api/deliveries', { method:'POST', body: JSON.stringify({ campaignId, fileKey: currentFileKey }) });
+      if (!res) return;
       const data = await res.json();
-      if (!res.ok) { toast('toast-send', data.error || 'Erro', 'error'); return; }
-
-      toast('toast-send', 'Envio iniciado! A redirigir para o histórico...', 'success');
+      if (!res.ok) { toast('toast-send', data.error||'Erro', 'error'); btn.disabled=false; btn.textContent='Enviar agora'; return; }
+      toast('toast-send', 'Envio iniciado! A redirigir...', 'success');
       currentFileKey = null;
       setTimeout(() => window.location.href = 'history.html', 1800);
-
-    } catch { toast('toast-send', 'Erro de ligação ao servidor', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Enviar agora'; }
+    } catch { toast('toast-send', 'Erro de ligação', 'error'); btn.disabled=false; btn.textContent='Enviar agora'; }
   }
 </script>
 </body>
