@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Campanhas — MailBridge</title>
 <link rel="stylesheet" href="style.css">
+<style>
+  .var-hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .var-hint code{font-family:"JetBrains Mono",monospace;background:var(--blue-light);color:var(--blue-dark);padding:1px 6px;border-radius:4px;font-size:11px;cursor:pointer;transition:all .15s;display:inline-block}
+  .var-hint code:hover{background:var(--blue);color:white}
+  .var-dropdown{display:none;position:absolute;background:white;border:1.5px solid var(--blue-mid);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;min-width:200px;overflow:hidden;top:100%;left:0}
+  .var-dropdown-item{padding:8px 14px;cursor:pointer;font-size:13px;font-family:"JetBrains Mono",monospace;transition:background .1s;color:var(--text)}
+  .var-dropdown-item:hover{background:var(--blue-light);color:var(--blue-dark)}
+  .var-dropdown-add{border-top:1px solid var(--border);padding:8px 14px;cursor:pointer;font-size:12px;color:var(--muted);transition:background .1s}
+  .var-dropdown-add:hover{background:var(--surface)}
+  .field-wrap{position:relative}
+  .char-count{font-size:11px;color:var(--muted);text-align:right;margin-top:3px}
+  .campaign-badge{font-family:"JetBrains Mono",monospace;font-size:10px;background:var(--blue-light);color:var(--blue-dark);border:1px solid var(--blue-mid);padding:2px 8px;border-radius:100px;margin-left:8px}
+</style>
 </head>
 <body>
 <script src="auth.js"></script>
@@ -18,30 +31,46 @@
 <main>
   <div class="card">
     <div class="card-title">Nova campanha</div>
-    <div class="field"><label>Nome interno</label><input type="text" id="name" placeholder="Newsletter Maio 2025"></div>
+
+    <div class="field">
+      <label>Nome interno</label>
+      <input type="text" id="name" placeholder="Newsletter Maio 2025">
+      <div class="var-hint">Identificador para uso interno — não aparece no email</div>
+    </div>
+
     <div class="field">
       <label>Assunto do email</label>
-    <div style="position:relative">
-      <input type="text" id="subject" placeholder="Olá {{name}}, temos novidades!" oninput="checkSlashInput(event)">
-      <div id="var-dropdown-subject" style="display:none;position:absolute;background:white;border:1.5px solid var(--blue-mid);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;min-width:200px;overflow:hidden"></div>
+      <div class="field-wrap">
+        <input type="text" id="subject" placeholder="Olá {{name}}, temos novidades!" oninput="checkSlashInput(this, 'dd-subject')">
+        <div class="var-dropdown" id="dd-subject"></div>
+      </div>
+      <div class="var-hint">
+        Escreve <code onclick="insertAtCursor(document.getElementById('subject'), '{{name}}')">/</code> para ver variáveis disponíveis &nbsp;&bull;&nbsp;
+        Variáveis base: <code onclick="insertAtCursor(document.getElementById('subject'), '{{name}}')">{{name}}</code> <code onclick="insertAtCursor(document.getElementById('subject'), '{{email}}')">{{email}}</code>
+      </div>
     </div>
-      <div class="hint">Usa <code>{{name}}</code> para personalizar com o nome do destinatário.</div>
-    </div>
+
     <div class="field">
       <label>Corpo do email</label>
-      <div style="position:relative">
-        <textarea id="message" rows="6" placeholder="Olá {{name}},&#10;&#10;Escreve aqui a tua mensagem..." oninput="checkSlash(event)"></textarea>
-        <div id="var-dropdown" style="display:none;position:absolute;background:white;border:1.5px solid var(--blue-mid);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:100;min-width:200px;overflow:hidden"></div>
+      <div class="field-wrap">
+        <textarea id="message" rows="7" placeholder="Olá {{name}},&#10;&#10;Escreve aqui a tua mensagem..." oninput="checkSlashTextarea(this, 'dd-message')"></textarea>
+        <div class="var-dropdown" id="dd-message"></div>
       </div>
-      <div class="hint">Variáveis disponíveis: <code>{{name}}</code> <code>{{email}}</code></div>
+      <div class="char-count" id="char-count">0 caracteres</div>
+      <div class="var-hint">
+        Escreve <code>/</code> para inserir uma variável &nbsp;&bull;&nbsp;
+        Variáveis base: <code onclick="insertAtCursor(document.getElementById('message'), '{{name}}')">{{name}}</code> <code onclick="insertAtCursor(document.getElementById('message'), '{{email}}')">{{email}}</code>
+        &nbsp;&bull;&nbsp; Qualquer coluna do CSV/Excel é automáticamente uma variável
+      </div>
     </div>
+
     <div class="form-footer">
       <button class="btn btn-primary" id="save-btn" onclick="save()">Criar campanha</button>
     </div>
     <div class="toast" id="toast"></div>
   </div>
 
-  <div>
+  <div class="list-wrap">
     <div class="list-header">
       <div class="list-title">Campanhas existentes</div>
     </div>
@@ -53,28 +82,94 @@
 <script>
   renderNav('campaigns');
 
+  const BASE_VARS = ['name', 'email'];
+
+  function getDynamicVars() {
+    try { return JSON.parse(localStorage.getItem('mb_last_vars') || '[]'); } catch { return []; }
+  }
+
+  function allVars() {
+    return [...new Set([...BASE_VARS, ...getDynamicVars()])];
+  }
+
+  function buildDropdown(dropId, targetEl) {
+    const dd = document.getElementById(dropId);
+    const vars = allVars();
+    dd.innerHTML = vars.map(v =>
+      '<div class="var-dropdown-item" onclick="insertVar(document.getElementById(\'' + targetEl + '\'), \'' + v + '\', \'' + dropId + '\')">{{'+ v +'}}</div>'
+    ).join('') +
+    '<div class="var-dropdown-add" onclick="customVar(document.getElementById(\'' + targetEl + '\'), \'' + dropId + '\')">+ variável personalizada</div>';
+    dd.style.display = 'block';
+  }
+
+  function checkSlashInput(el, dropId) {
+    const pos = el.selectionStart;
+    if (el.value[pos - 1] === '/') {
+      buildDropdown(dropId, el.id);
+    } else {
+      document.getElementById(dropId).style.display = 'none';
+    }
+  }
+
+  function checkSlashTextarea(el, dropId) {
+    document.getElementById('char-count').textContent = el.value.length + ' caracteres';
+    checkSlashInput(el, dropId);
+  }
+
+  function insertVar(el, varName, dropId) {
+    const pos = el.selectionStart;
+    const val = el.value;
+    el.value = val.slice(0, pos - 1) + '{{'+ varName +'}}' + val.slice(pos);
+    el.focus();
+    el.selectionStart = el.selectionEnd = pos - 1 + varName.length + 4;
+    document.getElementById(dropId).style.display = 'none';
+    if (el.id === 'message') document.getElementById('char-count').textContent = el.value.length + ' caracteres';
+  }
+
+  function insertAtCursor(el, text) {
+    const pos = el.selectionStart || el.value.length;
+    el.value = el.value.slice(0, pos) + text + el.value.slice(pos);
+    el.focus();
+    el.selectionStart = el.selectionEnd = pos + text.length;
+    if (el.id === 'message') document.getElementById('char-count').textContent = el.value.length + ' caracteres';
+  }
+
+  function customVar(el, dropId) {
+    const name = prompt('Nome da variável (ex: empresa):');
+    if (name && name.trim()) insertVar(el, name.trim().toLowerCase(), dropId);
+  }
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.var-dropdown') && !e.target.closest('input,textarea')) {
+      document.querySelectorAll('.var-dropdown').forEach(d => d.style.display = 'none');
+    }
+  });
+
   async function load() {
     try {
       const res = await apiFetch('/api/campaigns');
       const campaigns = await res.json();
       document.getElementById('count-badge').textContent = campaigns.length + ' campanha' + (campaigns.length !== 1 ? 's' : '');
       const list = document.getElementById('list');
-      if (!campaigns.length) { list.innerHTML = '<div class="empty">Ainda não há campanhas. Cria a primeira acima.</div>'; return; }
-      list.innerHTML = campaigns.map(c => `
-        <div class="item" style="align-items:flex-start" id="ci-${c.id}">
-          <div class="item-icon" style="margin-top:2px">
-            <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          </div>
-          <div class="item-body">
-            <div class="item-title">${esc(c.name)}</div>
-            <div class="item-sub" style="font-family:'Figtree',sans-serif;color:var(--blue);font-weight:500">✉ ${esc(c.subject)}</div>
-            <div class="item-desc">${esc(c.message)}</div>
-          </div>
-          <div class="item-actions">
-            <a class="btn-send" href="send.html">Usar</a>
-            <button class="btn btn-danger" onclick="del(${c.id})">Eliminar</button>
-          </div>
-        </div>`).join('');
+      if (!campaigns.length) {
+        list.innerHTML = '<div class="empty">Ainda não há campanhas. Cria a primeira acima.</div>';
+        return;
+      }
+      list.innerHTML = campaigns.map(c => {
+        const vars = (c.message.match(/\{\{(\w+)\}\}/g) || []);
+        const uniqueVars = [...new Set(vars)];
+        return '<div class="item" style="align-items:flex-start" id="ci-' + c.id + '">' +
+          '<div class="item-icon" style="margin-top:2px"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>' +
+          '<div class="item-body">' +
+            '<div class="item-title">' + esc(c.name) + (uniqueVars.length ? '<span class="campaign-badge">' + uniqueVars.length + ' variáveis</span>' : '') + '</div>' +
+            '<div class="item-sub" style="font-family:Figtree,sans-serif;color:var(--blue);font-weight:500">✉ ' + esc(c.subject) + '</div>' +
+            '<div class="item-desc">' + esc(c.message) + '</div>' +
+          '</div>' +
+          '<div class="item-actions">' +
+            '<a class="btn-send" href="send.html">Usar</a>' +
+            '<button class="btn btn-danger" onclick="del(' + c.id + ')">Eliminar</button>' +
+          '</div></div>';
+      }).join('');
     } catch { document.getElementById('list').innerHTML = '<div class="empty">Erro ao carregar.</div>'; }
   }
 
@@ -86,13 +181,14 @@
     if (!name || !subject || !message) { toast('toast', 'Preenche todos os campos', 'error'); return; }
     btn.disabled = true; btn.textContent = '...';
     try {
-      const res = await apiFetch('/api/campaigns', { method:'POST', body: JSON.stringify({name, subject, message}) });
+      const res = await apiFetch('/api/campaigns', { method: 'POST', body: JSON.stringify({ name, subject, message }) });
       const data = await res.json();
       if (!res.ok) { toast('toast', data.error || 'Erro', 'error'); return; }
       toast('toast', 'Campanha criada!', 'success');
       document.getElementById('name').value = '';
       document.getElementById('subject').value = '';
       document.getElementById('message').value = '';
+      document.getElementById('char-count').textContent = '0 caracteres';
       load();
     } catch { toast('toast', 'Erro de ligação', 'error'); }
     finally { btn.disabled = false; btn.textContent = 'Criar campanha'; }
@@ -100,81 +196,9 @@
 
   async function del(id) {
     if (!confirm('Eliminar esta campanha?')) return;
-    try {
-      await apiFetch(`/api/campaigns/${id}`, { method:'DELETE' });
-      load();
-    } catch { toast('toast', 'Erro ao eliminar', 'error'); }
+    try { await apiFetch('/api/campaigns/' + id, { method: 'DELETE' }); load(); }
+    catch { toast('toast', 'Erro ao eliminar', 'error'); }
   }
-
-  // Variáveis base sempre disponíveis
-  const baseVars = ['name', 'email'];
-  // Variáveis dinâmicas do último ficheiro carregado (partilhadas via localStorage)
-  let dynamicVars = [];
-
-  try {
-    const saved = localStorage.getItem('mb_last_vars');
-    if (saved) dynamicVars = JSON.parse(saved);
-  } catch(e) {}
-
-  function checkSlash(e) {
-    const ta = document.getElementById('message');
-    const val = ta.value;
-    const pos = ta.selectionStart;
-    
-    // Detecta se o último caracter escrito foi /
-    if (val[pos-1] !== '/') {
-      document.getElementById('var-dropdown').style.display = 'none';
-      return;
-    }
-
-    // Filtra variáveis com o texto após /
-    showVarDropdown(ta, pos);
-  }
-
-  function showVarDropdown(ta, pos) {
-    const allVars = [...new Set([...baseVars, ...dynamicVars])];
-    const dropdown = document.getElementById('var-dropdown');
-    
-    dropdown.innerHTML = allVars.map(v => `
-      <div onclick="insertVar('${v}')" style="padding:8px 14px;cursor:pointer;font-size:13px;font-family:'JetBrains Mono',monospace;transition:background .1s" 
-          onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
-        {{${v}}}
-      </div>
-    `).join('') + `
-      <div style="border-top:1px solid #e2e8f0;padding:8px 14px;cursor:pointer;font-size:12px;color:var(--muted)" 
-          onclick="insertCustomVar()" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
-        + variável personalizada
-      </div>
-    `;
-    
-    // Posiciona o dropdown abaixo do cursor
-    dropdown.style.display = 'block';
-    dropdown.style.top = '100%';
-    dropdown.style.left = '14px';
-  }
-
-  function insertVar(varName) {
-    const ta = document.getElementById('message');
-    const pos = ta.selectionStart;
-    const val = ta.value;
-    // Remove o / e insere {{varName}}
-    ta.value = val.slice(0, pos-1) + '{{' + varName + '}}' + val.slice(pos);
-    ta.focus();
-    ta.selectionStart = ta.selectionEnd = pos - 1 + varName.length + 4;
-    document.getElementById('var-dropdown').style.display = 'none';
-  }
-
-  function insertCustomVar() {
-    const name = prompt('Nome da variável (ex: empresa):');
-    if (name && name.trim()) insertVar(name.trim().toLowerCase());
-  }
-
-  // Fecha dropdown ao clicar fora
-  document.addEventListener('click', e => {
-    if (!e.target.closest('#var-dropdown') && e.target.id !== 'message') {
-      document.getElementById('var-dropdown').style.display = 'none';
-    }
-  });
 
   load();
 </script>

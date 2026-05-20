@@ -12,22 +12,22 @@
   .hero h1 em{font-style:normal;color:var(--blue)}
   .hero p{font-size:15px;color:var(--muted);line-height:1.6}
   .section-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;margin-top:28px}
-  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:4px}
   .chart-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
-  .chart-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
-  .chart-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+  .chart-card.full{grid-column:1/-1}
+  .chart-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+  .chart-sub{font-size:12px;color:var(--muted);margin-bottom:18px}
   .chart-wrap{position:relative;height:200px}
+  .chart-wrap.tall{height:160px}
   .quick{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-  .quick-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);transition:all .2s}
+  .quick-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);transition:all .2s}
   .quick-card:hover{border-color:var(--blue);box-shadow:0 4px 20px rgba(59,130,246,.12);transform:translateY(-2px)}
-  .quick-icon{width:42px;height:42px;background:var(--blue-light);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .quick-icon{width:40px;height:40px;background:var(--blue-light);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .quick-icon svg{width:20px;height:20px;stroke:var(--blue);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .quick-body{}
   .quick-title{font-size:14px;font-weight:600;margin-bottom:2px}
   .quick-desc{font-size:12px;color:var(--muted);line-height:1.4}
-  .stat-number.loading{color:var(--border)}
-  .no-data{display:flex;align-items:center;justify-content:center;height:100%;font-size:13px;color:var(--muted);flex-direction:column;gap:8px}
-  .no-data svg{width:32px;height:32px;stroke:var(--border);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .no-data{display:flex;align-items:center;justify-content:center;height:100%;font-size:13px;color:var(--muted);flex-direction:column;gap:6px}
+  .no-data svg{width:28px;height:28px;stroke:var(--border);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 </style>
 </head>
 <body>
@@ -54,7 +54,6 @@
 </div>
 
 <main>
-  <!-- STATS CARDS -->
   <div class="stats">
     <div class="stat">
       <div class="stat-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
@@ -78,56 +77,51 @@
     </div>
   </div>
 
-  <!-- CHARTS -->
   <div class="section-label">Análise de desempenho</div>
   <div class="charts-grid">
-
-    <!-- Grafico donut: taxa de sucesso -->
     <div class="chart-card">
       <div class="chart-title">Taxa de entrega</div>
-      <div class="chart-sub">Emails enviados vs falhados (total acumulado)</div>
+      <div class="chart-sub">Sucesso vs falhados (total acumulado)</div>
       <div class="chart-wrap">
         <canvas id="chart-donut"></canvas>
-        <div class="no-data" id="no-data-donut" style="display:none">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Sem envios ainda
-        </div>
+        <div class="no-data" id="nd-donut" style="display:none"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Sem envios ainda</div>
       </div>
     </div>
-
-    <!-- Grafico barras: envios por campanha -->
     <div class="chart-card">
       <div class="chart-title">Envios por campanha</div>
-      <div class="chart-sub">Total de emails enviados em cada campanha</div>
+      <div class="chart-sub">Emails enviados e falhados por campanha</div>
       <div class="chart-wrap">
         <canvas id="chart-bars"></canvas>
-        <div class="no-data" id="no-data-bars" style="display:none">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Sem dados ainda
-        </div>
+        <div class="no-data" id="nd-bars" style="display:none"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Sem dados ainda</div>
       </div>
     </div>
-
+    <div class="chart-card full">
+      <div class="chart-title">Actividade ao longo do tempo</div>
+      <div class="chart-sub">Número de emails enviados por dia</div>
+      <div class="chart-wrap tall">
+        <canvas id="chart-line"></canvas>
+        <div class="no-data" id="nd-line" style="display:none"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Sem actividade registada</div>
+      </div>
+    </div>
   </div>
 
-  <!-- ACESSO RAPIDO -->
   <div class="section-label">Acesso rápido</div>
   <div class="quick">
     <a class="quick-card" href="send.html">
       <div class="quick-icon"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
-      <div class="quick-body"><div class="quick-title">Enviar campanha</div><div class="quick-desc">Carrega CSV ou Excel e envia para toda a lista</div></div>
+      <div><div class="quick-title">Enviar campanha</div><div class="quick-desc">Carrega CSV ou Excel e envia para toda a lista</div></div>
     </a>
     <a class="quick-card" href="campaigns.html">
       <div class="quick-icon"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
-      <div class="quick-body"><div class="quick-title">Gerir campanhas</div><div class="quick-desc">Cria templates com variáveis como {{name}}</div></div>
+      <div><div class="quick-title">Gerir campanhas</div><div class="quick-desc">Cria templates com variáveis como {{name}}</div></div>
     </a>
     <a class="quick-card" href="history.html">
       <div class="quick-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-      <div class="quick-body"><div class="quick-title">Histórico de envios</div><div class="quick-desc">Consulta todos os envios e os seus resultados</div></div>
+      <div><div class="quick-title">Histórico</div><div class="quick-desc">Consulta todos os envios e resultados</div></div>
     </a>
     <a class="quick-card" href="send.html">
       <div class="quick-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-      <div class="quick-body"><div class="quick-title">Importar lista</div><div class="quick-desc">Aceita CSV e Excel com colunas email e name</div></div>
+      <div><div class="quick-title">Importar lista</div><div class="quick-desc">CSV e Excel com colunas email e name</div></div>
     </a>
   </div>
 </main>
@@ -138,97 +132,74 @@
   const user = getUser();
   if (user) document.getElementById('hero-name').textContent = user.name.split(' ')[0];
 
-  let donutChart = null;
-  let barsChart  = null;
+  let donutChart = null, barsChart = null, lineChart = null;
+
+  const CHART_DEFAULTS = {
+    font: { family: 'Figtree, sans-serif', size: 12 },
+    color: '#64748b'
+  };
 
   async function load() {
     try {
-      // Carrega estatisticas gerais
-      const statsRes = await apiFetch('/api/stats');
-      if (!statsRes) return;
+      const [statsRes, delivRes] = await Promise.all([
+        apiFetch('/api/stats'),
+        apiFetch('/api/deliveries')
+      ]);
+      if (!statsRes || !delivRes) return;
+
       const s = await statsRes.json();
+      const deliveries = await delivRes.json();
 
       set('s-campaigns',  s.totalCampaigns);
       set('s-deliveries', s.totalDeliveries);
       set('s-sent',       s.totalEmailsSent);
       set('s-failed',     s.totalEmailsFailed);
 
-      // Grafico donut: taxa de sucesso vs falha
       const totalEmails = s.totalEmailsSent + s.totalEmailsFailed;
       if (totalEmails === 0) {
-        document.getElementById('chart-donut').style.display = 'none';
-        document.getElementById('no-data-donut').style.display = 'flex';
+        hide('chart-donut', 'nd-donut');
       } else {
         renderDonut(s.totalEmailsSent, s.totalEmailsFailed);
       }
 
-      // Carrega historico de envios para grafico de barras por campanha
-      const delivRes = await apiFetch('/api/deliveries');
-      if (!delivRes) return;
-      const deliveries = await delivRes.json();
-
       if (!deliveries || deliveries.length === 0) {
-        document.getElementById('chart-bars').style.display = 'none';
-        document.getElementById('no-data-bars').style.display = 'flex';
+        hide('chart-bars', 'nd-bars');
+        hide('chart-line', 'nd-line');
       } else {
         renderBars(deliveries);
+        renderLine(deliveries);
       }
-
-    } catch (e) {
-      console.error('Erro ao carregar dashboard:', e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   function renderDonut(sent, failed) {
-    const ctx = document.getElementById('chart-donut').getContext('2d');
     const pct = sent + failed > 0 ? Math.round((sent / (sent + failed)) * 100) : 0;
-
+    const ctx = document.getElementById('chart-donut').getContext('2d');
     if (donutChart) donutChart.destroy();
     donutChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
         labels: ['Enviados (' + sent + ')', 'Falhados (' + failed + ')'],
-        datasets: [{
-          data: [sent, failed],
-          backgroundColor: ['#10b981', '#ef4444'],
-          borderColor: ['#ffffff', '#ffffff'],
-          borderWidth: 3,
-          hoverOffset: 6
-        }]
+        datasets: [{ data: [sent, failed], backgroundColor: ['#10b981', '#ef4444'], borderColor: ['#fff', '#fff'], borderWidth: 3, hoverOffset: 6 }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '68%',
+        responsive: true, maintainAspectRatio: false, cutout: '68%',
         plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { size: 12, family: 'Figtree' }, color: '#64748b', padding: 16, usePointStyle: true }
-          },
-          tooltip: {
-            callbacks: {
-              label: (item) => ' ' + item.label + ' — ' + Math.round((item.raw / (sent + failed)) * 100) + '%'
-            }
-          }
+          legend: { position: 'bottom', labels: { ...CHART_DEFAULTS, padding: 14, usePointStyle: true } },
+          tooltip: { callbacks: { label: i => ' ' + i.label + ' — ' + Math.round((i.raw / (sent + failed)) * 100) + '%' } }
         }
       },
       plugins: [{
-        // Texto no centro do donut
-        id: 'centerText',
+        id: 'center',
         beforeDraw(chart) {
-          const { ctx, chartArea } = chart;
-          if (!chartArea) return;
-          const cx = (chartArea.left + chartArea.right) / 2;
-          const cy = (chartArea.top + chartArea.bottom) / 2;
+          const { ctx, chartArea: ca } = chart;
+          if (!ca) return;
+          const cx = (ca.left + ca.right) / 2, cy = (ca.top + ca.bottom) / 2;
           ctx.save();
-          ctx.font = 'bold 22px Figtree, sans-serif';
-          ctx.fillStyle = '#0f172a';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(pct + '%', cx, cy - 8);
-          ctx.font = '12px Figtree, sans-serif';
-          ctx.fillStyle = '#64748b';
-          ctx.fillText('sucesso', cx, cy + 12);
+          ctx.font = 'bold 20px Figtree,sans-serif'; ctx.fillStyle = '#0f172a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(pct + '%', cx, cy - 7);
+          ctx.font = '11px Figtree,sans-serif'; ctx.fillStyle = '#64748b';
+          ctx.fillText('sucesso', cx, cy + 10);
           ctx.restore();
         }
       }]
@@ -236,24 +207,15 @@
   }
 
   function renderBars(deliveries) {
-    // Agrupa envios por campanha e soma os emails enviados
     const map = {};
     for (const d of deliveries) {
-      const name = d.campaignName || ('Campanha #' + d.campaignId);
+      const name = d.campaignName || '#' + d.campaignId;
       if (!map[name]) map[name] = { sent: 0, failed: 0 };
-      map[name].sent   += d.sent   || 0;
+      map[name].sent   += d.sent || 0;
       map[name].failed += d.failed || 0;
     }
-
-    // Ordena por total enviado (decrescente) e limita a 8 campanhas para nao encher
-    const entries = Object.entries(map)
-      .sort((a, b) => (b[1].sent + b[1].failed) - (a[1].sent + a[1].failed))
-      .slice(0, 8);
-
-    const labels  = entries.map(([name]) => name.length > 18 ? name.slice(0, 16) + '...' : name);
-    const sentArr = entries.map(([, v]) => v.sent);
-    const failArr = entries.map(([, v]) => v.failed);
-
+    const entries = Object.entries(map).sort((a, b) => (b[1].sent + b[1].failed) - (a[1].sent + a[1].failed)).slice(0, 8);
+    const labels = entries.map(([n]) => n.length > 16 ? n.slice(0, 14) + '…' : n);
     const ctx = document.getElementById('chart-bars').getContext('2d');
     if (barsChart) barsChart.destroy();
     barsChart = new Chart(ctx, {
@@ -261,49 +223,72 @@
       data: {
         labels,
         datasets: [
-          {
-            label: 'Enviados',
-            data: sentArr,
-            backgroundColor: 'rgba(59,130,246,0.85)',
-            borderRadius: 6,
-            borderSkipped: false
-          },
-          {
-            label: 'Falhados',
-            data: failArr,
-            backgroundColor: 'rgba(239,68,68,0.75)',
-            borderRadius: 6,
-            borderSkipped: false
-          }
+          { label: 'Enviados', data: entries.map(([,v]) => v.sent), backgroundColor: 'rgba(59,130,246,0.85)', borderRadius: 5, borderSkipped: false },
+          { label: 'Falhados', data: entries.map(([,v]) => v.failed), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 5, borderSkipped: false }
         ]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { size: 12, family: 'Figtree' }, color: '#64748b', padding: 16, usePointStyle: true }
-          },
-          tooltip: {
-            callbacks: {
-              title: (items) => items[0].label
-            }
-          }
-        },
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { ...CHART_DEFAULTS, padding: 14, usePointStyle: true } } },
         scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: '#64748b', font: { size: 11, family: 'Figtree' } }
-          },
-          y: {
-            beginAtZero: true,
-            grid: { color: 'rgba(0,0,0,0.05)' },
-            ticks: { color: '#64748b', font: { size: 11, family: 'Figtree' }, precision: 0 }
-          }
+          x: { grid: { display: false }, ticks: { ...CHART_DEFAULTS } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { ...CHART_DEFAULTS, precision: 0 } }
         }
       }
     });
+  }
+
+  function renderLine(deliveries) {
+    // Agrupa por data (YYYY-MM-DD) e soma emails enviados
+    const byDate = {};
+    for (const d of deliveries) {
+      const date = (d.createdAt || '').split('T')[0].split(' ')[0];
+      if (!date) continue;
+      if (!byDate[date]) byDate[date] = 0;
+      byDate[date] += d.sent || 0;
+    }
+    const sorted = Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]));
+    if (!sorted.length) { hide('chart-line', 'nd-line'); return; }
+
+    const labels = sorted.map(([d]) => {
+      const parts = d.split('-');
+      return parts[2] + '/' + parts[1];
+    });
+    const data = sorted.map(([, v]) => v);
+
+    const ctx = document.getElementById('chart-line').getContext('2d');
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Emails enviados',
+          data,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#3b82f6',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { ...CHART_DEFAULTS } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { ...CHART_DEFAULTS, precision: 0 } }
+        }
+      }
+    });
+  }
+
+  function hide(canvasId, noDataId) {
+    document.getElementById(canvasId).style.display = 'none';
+    document.getElementById(noDataId).style.display = 'flex';
   }
 
   function set(id, val) {

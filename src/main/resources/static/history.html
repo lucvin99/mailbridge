@@ -5,6 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Histórico — MailBridge</title>
 <link rel="stylesheet" href="style.css">
+<style>
+  .filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+  .filter-btn{padding:6px 16px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted);transition:all .15s;font-family:"Figtree",sans-serif}
+  .filter-btn:hover{border-color:var(--blue-mid);color:var(--blue)}
+  .filter-btn.active{background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-mid)}
+  .summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+  .summary-item{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 18px;box-shadow:var(--shadow)}
+  .summary-label{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .summary-val{font-size:22px;font-weight:600;color:var(--text)}
+  .summary-val.green{color:var(--green)}
+  .summary-val.red{color:var(--red)}
+  .d-item{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:20px 24px;box-shadow:var(--shadow);margin-bottom:8px;animation:fadeIn .2s ease;transition:border-color .15s}
+  .d-item.running{border-color:var(--blue-mid)}
+  .d-item.done{border-color:#bbf7d0}
+  .d-item.error{border-color:#fecaca}
+  .d-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .d-left{display:flex;align-items:center;gap:12px}
+  .d-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .d-icon svg{width:18px;height:18px;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .d-icon.pending{background:#fefce8} .d-icon.pending svg{stroke:var(--orange)}
+  .d-icon.running{background:var(--blue-light)} .d-icon.running svg{stroke:var(--blue)}
+  .d-icon.done{background:#f0fdf4} .d-icon.done svg{stroke:var(--green)}
+  .d-icon.error{background:#fef2f2} .d-icon.error svg{stroke:var(--red)}
+  .d-name{font-size:15px;font-weight:600}
+  .d-meta{font-size:12px;color:var(--muted);font-family:"JetBrains Mono",monospace;margin-top:2px}
+  .d-pct{font-size:12px;font-weight:600}
+  .d-pct.high{color:var(--green)}
+  .d-pct.mid{color:var(--orange)}
+  .d-pct.low{color:var(--red)}
+  .no-results{text-align:center;padding:48px;color:var(--muted);font-size:14px;border:1.5px dashed var(--border);border-radius:var(--radius)}
+</style>
 </head>
 <body>
 <script src="auth.js"></script>
@@ -14,19 +45,50 @@
   <div>
     <div class="page-title">Histórico de <span>Envios</span></div>
   </div>
+  <a href="send.html" class="btn btn-primary" style="font-size:13px;padding:8px 18px">+ Novo envio</a>
 </div>
 
 <main>
+  <!-- SUMARIO -->
+  <div class="summary-bar" id="summary-bar" style="display:none">
+    <div class="summary-item">
+      <div class="summary-label">Total de envios</div>
+      <div class="summary-val" id="sum-total">0</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Emails processados</div>
+      <div class="summary-val" id="sum-processed">0</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Enviados com sucesso</div>
+      <div class="summary-val green" id="sum-sent">0</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Falhados</div>
+      <div class="summary-val red" id="sum-failed">0</div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filters">
+    <button class="filter-btn active" onclick="filter('all', this)">Todos</button>
+    <button class="filter-btn" onclick="filter('running', this)">A enviar</button>
+    <button class="filter-btn" onclick="filter('done', this)">Concluídos</button>
+    <button class="filter-btn" onclick="filter('error', this)">Com erros</button>
+  </div>
+
   <div id="list"></div>
 </main>
 
 <script src="nav.js"></script>
 <script>
   renderNav('history');
+  let allDeliveries = [];
+  let currentFilter = 'all';
   let pollInterval = null;
 
   function statusLabel(s) {
-    return { pending:'A aguardar', running:'A enviar', done:'Concluído', error:'Com erros' }[s] || s;
+    return { pending: 'A aguardar', running: 'A enviar', done: 'Concluído', error: 'Com erros' }[s] || s;
   }
 
   function iconSvg(s) {
@@ -36,54 +98,91 @@
     return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
   }
 
+  function pctClass(pct) {
+    if (pct >= 90) return 'high';
+    if (pct >= 60) return 'mid';
+    return 'low';
+  }
+
   function renderDelivery(d) {
-    const pct = d.totalContacts > 0
-      ? Math.round(((d.sent + d.failed) / d.totalContacts) * 100) : 0;
-    return `
-      <div class="d-item ${d.status}">
-        <div class="d-top">
-          <div class="d-left">
-            <div class="d-icon ${d.status}">${iconSvg(d.status)}</div>
-            <div>
-              <div class="d-name">${esc(d.campaignName || 'Campanha #' + d.campaignId)}</div>
-              <div class="d-meta">${(d.createdAt || '').replace('T',' ').slice(0,16)} · ID #${d.id}</div>
-            </div>
-          </div>
-          <span class="badge ${d.status}">${statusLabel(d.status)}</span>
-        </div>
-        <div class="progress-wrap">
-          <div class="progress-labels">
-            <span>${d.sent + d.failed} de ${d.totalContacts} processados</span>
-            <strong>${pct}%</strong>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill ${d.status}" style="width:${pct}%"></div>
-          </div>
-        </div>
-        <div class="d-stats">
-          <div><div class="d-stat-label">Total</div><div class="d-stat-val">${d.totalContacts}</div></div>
-          <div><div class="d-stat-label">Enviados</div><div class="d-stat-val s">${d.sent}</div></div>
-          <div><div class="d-stat-label">Falhados</div><div class="d-stat-val f">${d.failed}</div></div>
-        </div>
-      </div>`;
+    const total = d.totalContacts || 0;
+    const processed = (d.sent || 0) + (d.failed || 0);
+    const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+    const successPct = processed > 0 ? Math.round(((d.sent || 0) / processed) * 100) : 0;
+    const date = (d.createdAt || '').replace('T', ' ').slice(0, 16);
+
+    return '<div class="d-item ' + d.status + '">' +
+      '<div class="d-top">' +
+        '<div class="d-left">' +
+          '<div class="d-icon ' + d.status + '">' + iconSvg(d.status) + '</div>' +
+          '<div>' +
+            '<div class="d-name">' + esc(d.campaignName || 'Campanha #' + d.campaignId) + '</div>' +
+            '<div class="d-meta">' + date + ' · ID #' + d.id + ' · ' + total + ' destinatários</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          (d.status === 'done' && processed > 0 ? '<span class="d-pct ' + pctClass(successPct) + '">' + successPct + '% sucesso</span>' : '') +
+          '<span class="badge ' + d.status + '">' + statusLabel(d.status) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="progress-wrap">' +
+        '<div class="progress-labels"><span>' + processed + ' de ' + total + ' processados</span><strong>' + pct + '%</strong></div>' +
+        '<div class="progress-bar"><div class="progress-fill ' + d.status + '" style="width:' + pct + '%"></div></div>' +
+      '</div>' +
+      '<div class="d-stats">' +
+        '<div><div class="d-stat-label">Total</div><div class="d-stat-val">' + total + '</div></div>' +
+        '<div><div class="d-stat-label">Enviados</div><div class="d-stat-val s">' + (d.sent || 0) + '</div></div>' +
+        '<div><div class="d-stat-label">Falhados</div><div class="d-stat-val f">' + (d.failed || 0) + '</div></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function filter(status, btn) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  }
+
+  function render() {
+    const filtered = currentFilter === 'all'
+      ? allDeliveries
+      : allDeliveries.filter(d => d.status === currentFilter);
+
+    const list = document.getElementById('list');
+    if (!filtered.length) {
+      list.innerHTML = '<div class="no-results">' +
+        (allDeliveries.length === 0
+          ? 'Ainda não há envios. <a href="send.html" style="color:var(--blue)">Inicia o primeiro →</a>'
+          : 'Nenhum envio com este filtro.') +
+        '</div>';
+      return;
+    }
+    list.innerHTML = filtered.map(renderDelivery).join('');
   }
 
   async function load() {
     try {
       const res = await apiFetch('/api/deliveries');
       if (!res) return;
-      const deliveries = await res.json();
-      const list = document.getElementById('list');
-      if (!deliveries.length) {
-        list.innerHTML = '<div class="empty">Ainda não há envios. <a href="send.html" style="color:var(--blue)">Inicia o primeiro →</a></div>';
-        return;
+      allDeliveries = await res.json();
+
+      // Calcula sumário
+      if (allDeliveries.length > 0) {
+        const totalSent   = allDeliveries.reduce((a, d) => a + (d.sent || 0), 0);
+        const totalFailed = allDeliveries.reduce((a, d) => a + (d.failed || 0), 0);
+        document.getElementById('sum-total').textContent     = allDeliveries.length;
+        document.getElementById('sum-processed').textContent = totalSent + totalFailed;
+        document.getElementById('sum-sent').textContent      = totalSent;
+        document.getElementById('sum-failed').textContent    = totalFailed;
+        document.getElementById('summary-bar').style.display = 'grid';
       }
-      list.innerHTML = deliveries.map(renderDelivery).join('');
-      const running = deliveries.some(d => d.status === 'running' || d.status === 'pending');
+
+      render();
+
+      const running = allDeliveries.some(d => d.status === 'running' || d.status === 'pending');
       if (running) startPolling(); else stopPolling();
-    } catch (e) {
-      document.getElementById('list').innerHTML = '<div class="empty">Erro ao carregar envios.</div>';
-    }
+    } catch { document.getElementById('list').innerHTML = '<div class="no-results">Erro ao carregar envios.</div>'; }
   }
 
   function startPolling() { if (!pollInterval) pollInterval = setInterval(load, 2000); }

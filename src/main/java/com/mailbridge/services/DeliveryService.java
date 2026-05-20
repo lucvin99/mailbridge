@@ -102,7 +102,7 @@ public class DeliveryService {
         if (recipients == null || recipients.isEmpty())
             throw new ValidationException("Ficheiro não encontrado ou já utilizado. Faz upload novamente.");
 
-        int deliveryId = deliveryRepo.create(userId, campaignId, recipients.size());
+        int deliveryId = deliveryRepo.create(userId, campaignId, recipients.size(), null);
 
         final Campaign finalCampaign = campaign;
         final List<Recipient> finalRecipients = recipients;
