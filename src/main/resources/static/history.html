@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Histórico — MailBridge</title>
+<title>Historico - MailBridge</title>
 <link rel="stylesheet" href="style.css">
 <style>
   .filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-  .filter-btn{padding:6px 16px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted);transition:all .15s;font-family:"Figtree",sans-serif}
+  .filter-btn{padding:6px 16px;border-radius:100px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted);transition:all .15s;font-family:Figtree,sans-serif}
   .filter-btn:hover{border-color:var(--blue-mid);color:var(--blue)}
   .filter-btn.active{background:var(--blue-light);color:var(--blue-dark);border-color:var(--blue-mid)}
   .summary-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
@@ -29,164 +29,202 @@
   .d-icon.done{background:#f0fdf4} .d-icon.done svg{stroke:var(--green)}
   .d-icon.error{background:#fef2f2} .d-icon.error svg{stroke:var(--red)}
   .d-name{font-size:15px;font-weight:600}
-  .d-meta{font-size:12px;color:var(--muted);font-family:"JetBrains Mono",monospace;margin-top:2px}
+  .d-meta{font-size:12px;color:var(--muted);font-family:JetBrains Mono,monospace;margin-top:2px}
   .d-pct{font-size:12px;font-weight:600}
-  .d-pct.high{color:var(--green)}
-  .d-pct.mid{color:var(--orange)}
-  .d-pct.low{color:var(--red)}
+  .d-pct.high{color:var(--green)} .d-pct.mid{color:var(--orange)} .d-pct.low{color:var(--red)}
   .no-results{text-align:center;padding:48px;color:var(--muted);font-size:14px;border:1.5px dashed var(--border);border-radius:var(--radius)}
+  .error-log{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px}
+  .error-log-email{font-weight:500;margin-bottom:3px}
+  .error-log-msg{color:#991b1b;margin-bottom:3px}
+  .error-log-fix{color:var(--muted)}
+  .error-log-detail{font-family:monospace;font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all}
 </style>
 </head>
 <body>
 <script src="auth.js"></script>
 <script>requireAuth();</script>
-
 <div class="page-header">
-  <div>
-    <div class="page-title">Histórico de <span>Envios</span></div>
-  </div>
+  <div><div class="page-title">Historico de <span>Envios</span></div></div>
   <a href="send.html" class="btn btn-primary" style="font-size:13px;padding:8px 18px">+ Novo envio</a>
 </div>
-
 <main>
-  <!-- SUMARIO -->
   <div class="summary-bar" id="summary-bar" style="display:none">
-    <div class="summary-item">
-      <div class="summary-label">Total de envios</div>
-      <div class="summary-val" id="sum-total">0</div>
-    </div>
-    <div class="summary-item">
-      <div class="summary-label">Emails processados</div>
-      <div class="summary-val" id="sum-processed">0</div>
-    </div>
-    <div class="summary-item">
-      <div class="summary-label">Enviados com sucesso</div>
-      <div class="summary-val green" id="sum-sent">0</div>
-    </div>
-    <div class="summary-item">
-      <div class="summary-label">Falhados</div>
-      <div class="summary-val red" id="sum-failed">0</div>
-    </div>
+    <div class="summary-item"><div class="summary-label">Total de envios</div><div class="summary-val" id="sum-total">0</div></div>
+    <div class="summary-item"><div class="summary-label">Emails processados</div><div class="summary-val" id="sum-processed">0</div></div>
+    <div class="summary-item"><div class="summary-label">Enviados com sucesso</div><div class="summary-val green" id="sum-sent">0</div></div>
+    <div class="summary-item"><div class="summary-label">Falhados</div><div class="summary-val red" id="sum-failed">0</div></div>
   </div>
-
-  <!-- FILTROS -->
   <div class="filters">
     <button class="filter-btn active" onclick="filter('all', this)">Todos</button>
     <button class="filter-btn" onclick="filter('running', this)">A enviar</button>
-    <button class="filter-btn" onclick="filter('done', this)">Concluídos</button>
+    <button class="filter-btn" onclick="filter('done', this)">Concluidos</button>
     <button class="filter-btn" onclick="filter('error', this)">Com erros</button>
   </div>
-
   <div id="list"></div>
 </main>
-
 <script src="nav.js"></script>
 <script>
-  renderNav('history');
-  let allDeliveries = [];
-  let currentFilter = 'all';
-  let pollInterval = null;
+  renderNav("history");
+  let allDeliveries = [], currentFilter = "all", pollInterval = null;
+
+  const ERROR_INFO = {
+    AuthenticationFailed: {
+      msg: "Credenciais Gmail incorrectas ou App Password invalida.",
+      fix: "Abre o db.properties e verifica mail.from e mail.password. Usa App Password gerada em myaccount.google.com."
+    },
+    InvalidAddress: {
+      msg: "Email invalido ou destinatario nao existe.",
+      fix: "Verifica se o endereco de email esta correcto na lista."
+    },
+    Timeout: {
+      msg: "Ligacao ao servidor demorou demasiado.",
+      fix: "Verifica a tua ligacao a internet."
+    },
+    ConnectionRefused: {
+      msg: "Nao foi possivel ligar ao servidor SMTP.",
+      fix: "Em modo teste verifica se o Mailpit esta a correr (mailpit.exe)."
+    },
+    RateLimitExceeded: {
+      msg: "Limite diario de envios do Gmail atingido.",
+      fix: "O Gmail permite ~500 emails por dia. Aguarda 24h antes de enviar novamente."
+    },
+    UnknownError: {
+      msg: "Erro desconhecido durante o envio.",
+      fix: "Consulta o ficheiro logs/mailbridge.log para mais detalhes tecnicos."
+    }
+  };
 
   function statusLabel(s) {
-    return { pending: 'A aguardar', running: 'A enviar', done: 'Concluído', error: 'Com erros' }[s] || s;
+    return {pending:"A aguardar",running:"A enviar",done:"Concluido",error:"Com erros"}[s]||s;
   }
 
   function iconSvg(s) {
-    if (s === 'done')    return '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
-    if (s === 'running') return '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
-    if (s === 'error')   return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+    if(s==="done")    return "<svg viewBox='0 0 24 24'><polyline points='20 6 9 17 4 12'/></svg>";
+    if(s==="running") return "<svg viewBox='0 0 24 24'><line x1='22' y1='2' x2='11' y2='13'/><polygon points='22 2 15 22 11 13 2 9 22 2'/></svg>";
+    if(s==="error")   return "<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>";
+    return "<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>";
   }
 
-  function pctClass(pct) {
-    if (pct >= 90) return 'high';
-    if (pct >= 60) return 'mid';
-    return 'low';
-  }
+  function pctClass(p) { return p>=90?"high":p>=60?"mid":"low"; }
 
   function renderDelivery(d) {
-    const total = d.totalContacts || 0;
-    const processed = (d.sent || 0) + (d.failed || 0);
-    const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
-    const successPct = processed > 0 ? Math.round(((d.sent || 0) / processed) * 100) : 0;
-    const date = (d.createdAt || '').replace('T', ' ').slice(0, 16);
-
-    return '<div class="d-item ' + d.status + '">' +
-      '<div class="d-top">' +
-        '<div class="d-left">' +
-          '<div class="d-icon ' + d.status + '">' + iconSvg(d.status) + '</div>' +
-          '<div>' +
-            '<div class="d-name">' + esc(d.campaignName || 'Campanha #' + d.campaignId) + '</div>' +
-            '<div class="d-meta">' + date + ' · ID #' + d.id + ' · ' + total + ' destinatários</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
-          (d.status === 'done' && processed > 0 ? '<span class="d-pct ' + pctClass(successPct) + '">' + successPct + '% sucesso</span>' : '') +
-          '<span class="badge ' + d.status + '">' + statusLabel(d.status) + '</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="progress-wrap">' +
-        '<div class="progress-labels"><span>' + processed + ' de ' + total + ' processados</span><strong>' + pct + '%</strong></div>' +
-        '<div class="progress-bar"><div class="progress-fill ' + d.status + '" style="width:' + pct + '%"></div></div>' +
-      '</div>' +
-      '<div class="d-stats">' +
-        '<div><div class="d-stat-label">Total</div><div class="d-stat-val">' + total + '</div></div>' +
-        '<div><div class="d-stat-label">Enviados</div><div class="d-stat-val s">' + (d.sent || 0) + '</div></div>' +
-        '<div><div class="d-stat-label">Falhados</div><div class="d-stat-val f">' + (d.failed || 0) + '</div></div>' +
-      '</div>' +
-    '</div>';
+    const total=d.totalContacts||0, processed=(d.sent||0)+(d.failed||0);
+    const pct=total>0?Math.round((processed/total)*100):0;
+    const spct=processed>0?Math.round(((d.sent||0)/processed)*100):0;
+    const date=(d.createdAt||"").replace("T"," ").slice(0,16);
+    return "<div class='d-item "+d.status+"'>"+
+      "<div class='d-top'>"+
+        "<div class='d-left'>"+
+          "<div class='d-icon "+d.status+"'>"+iconSvg(d.status)+"</div>"+
+          "<div><div class='d-name'>"+esc(d.campaignName||"Campanha #"+d.campaignId)+"</div>"+
+          "<div class='d-meta'>"+date+" · ID #"+d.id+" · "+total+" destinatarios</div></div>"+
+        "</div>"+
+        "<div style='display:flex;align-items:center;gap:10px'>"+
+          (d.status==="done"&&processed>0?"<span class='d-pct "+pctClass(spct)+"'>"+spct+"% sucesso</span>":"")+
+          "<span class='badge "+d.status+"'>"+statusLabel(d.status)+"</span>"+
+        "</div>"+
+      "</div>"+
+      "<div class='progress-wrap'>"+
+        "<div class='progress-labels'><span>"+processed+" de "+total+" processados</span><strong>"+pct+"%</strong></div>"+
+        "<div class='progress-bar'><div class='progress-fill "+d.status+"' style='width:"+pct+"%'></div></div>"+
+      "</div>"+
+      "<div class='d-stats'>"+
+        "<div><div class='d-stat-label'>Total</div><div class='d-stat-val'>"+total+"</div></div>"+
+        "<div><div class='d-stat-label'>Enviados</div><div class='d-stat-val s'>"+(d.sent||0)+"</div></div>"+
+        "<div><div class='d-stat-label'>Falhados</div><div class='d-stat-val f'>"+(d.failed||0)+"</div></div>"+
+      "</div>"+
+      (d.failed>0?
+        "<div style='margin-top:12px'><button class='btn-send' onclick='showLogs("+d.id+",this)' style='font-size:12px'>Ver detalhes dos erros</button>"+
+        "<div id='logs-"+d.id+"' style='display:none;margin-top:10px'></div></div>":"")+
+    "</div>";
   }
 
-  function filter(status, btn) {
-    currentFilter = status;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+  async function showLogs(deliveryId, btn) {
+    const wrap = document.getElementById("logs-"+deliveryId);
+    if(wrap.style.display==="block"){wrap.style.display="none";btn.textContent="Ver detalhes dos erros";return;}
+    btn.textContent="A carregar...";
+    try {
+      const res = await apiFetch("/api/deliveries/"+deliveryId+"/logs");
+      if(!res) return;
+      const logs = await res.json();
+      const failed = logs.filter(l=>l.status==="failed");
+      if(!failed.length){
+        wrap.innerHTML="<div style='font-size:13px;color:var(--green);padding:8px'>Nenhum erro registado.</div>";
+      } else {
+        wrap.innerHTML=
+          "<div style='font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px'>"+
+            failed.length+" email(s) com erro"+
+          "</div>"+
+          failed.map(l=>{
+            const info=ERROR_INFO[l.errorType]||ERROR_INFO.UnknownError;
+            return "<div class='error-log'>"+
+              "<div class='error-log-email'>✉ "+esc(l.email)+"</div>"+
+              "<div class='error-log-msg'>⚠ "+info.msg+"</div>"+
+              "<div class='error-log-fix'>💡 <strong>Como resolver:</strong> "+info.fix+"</div>"+
+              (l.errorDetail?"<div class='error-log-detail'>Detalhe: "+esc(l.errorDetail)+"</div>":"")+
+            "</div>";
+          }).join("");
+      }
+      wrap.style.display="block";
+      btn.textContent="Fechar detalhes";
+    } catch { btn.textContent="Ver detalhes dos erros"; }
+  }
+
+  function filter(status,btn){
+    currentFilter=status;
+    document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
     render();
   }
 
-  function render() {
-    const filtered = currentFilter === 'all'
-      ? allDeliveries
-      : allDeliveries.filter(d => d.status === currentFilter);
-
-    const list = document.getElementById('list');
-    if (!filtered.length) {
-      list.innerHTML = '<div class="no-results">' +
-        (allDeliveries.length === 0
-          ? 'Ainda não há envios. <a href="send.html" style="color:var(--blue)">Inicia o primeiro →</a>'
-          : 'Nenhum envio com este filtro.') +
-        '</div>';
+  function render(){
+    const filtered=currentFilter==="all"?allDeliveries:allDeliveries.filter(d=>d.status===currentFilter);
+    const list=document.getElementById("list");
+    if(!filtered.length){
+      list.innerHTML="<div class='no-results'>"+
+        (allDeliveries.length===0?"Ainda nao ha envios. <a href='send.html' style='color:var(--blue)'>Inicia o primeiro</a>":"Nenhum envio com este filtro.")+
+        "</div>";
       return;
     }
-    list.innerHTML = filtered.map(renderDelivery).join('');
-  }
-
-  async function load() {
-    try {
-      const res = await apiFetch('/api/deliveries');
-      if (!res) return;
-      allDeliveries = await res.json();
-
-      // Calcula sumário
-      if (allDeliveries.length > 0) {
-        const totalSent   = allDeliveries.reduce((a, d) => a + (d.sent || 0), 0);
-        const totalFailed = allDeliveries.reduce((a, d) => a + (d.failed || 0), 0);
-        document.getElementById('sum-total').textContent     = allDeliveries.length;
-        document.getElementById('sum-processed').textContent = totalSent + totalFailed;
-        document.getElementById('sum-sent').textContent      = totalSent;
-        document.getElementById('sum-failed').textContent    = totalFailed;
-        document.getElementById('summary-bar').style.display = 'grid';
+    // Guarda quais os logs que estao abertos para restaurar depois do re-render
+    const openLogs = new Set();
+    document.querySelectorAll("[id^='logs-']").forEach(el => {
+      if(el.style.display==="block") openLogs.add(el.id.replace("logs-",""));
+    });
+    list.innerHTML=filtered.map(renderDelivery).join("");
+    // Restaura logs que estavam abertos
+    openLogs.forEach(id => {
+      const wrap = document.getElementById("logs-"+id);
+      const btn  = document.querySelector("[onclick='showLogs("+id+",this)']");
+      if(wrap && wrap.innerHTML.trim()) {
+        wrap.style.display="block";
+        if(btn) btn.textContent="Fechar detalhes";
       }
-
-      render();
-
-      const running = allDeliveries.some(d => d.status === 'running' || d.status === 'pending');
-      if (running) startPolling(); else stopPolling();
-    } catch { document.getElementById('list').innerHTML = '<div class="no-results">Erro ao carregar envios.</div>'; }
+    });
   }
 
-  function startPolling() { if (!pollInterval) pollInterval = setInterval(load, 2000); }
-  function stopPolling()  { if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } }
+  async function load(){
+    try {
+      const res=await apiFetch("/api/deliveries");
+      if(!res) return;
+      allDeliveries=await res.json();
+      if(allDeliveries.length>0){
+        const ts=allDeliveries.reduce((a,d)=>a+(d.sent||0),0);
+        const tf=allDeliveries.reduce((a,d)=>a+(d.failed||0),0);
+        document.getElementById("sum-total").textContent=allDeliveries.length;
+        document.getElementById("sum-processed").textContent=ts+tf;
+        document.getElementById("sum-sent").textContent=ts;
+        document.getElementById("sum-failed").textContent=tf;
+        document.getElementById("summary-bar").style.display="grid";
+      }
+      render();
+      const running=allDeliveries.some(d=>d.status==="running"||d.status==="pending");
+      if(running) startPolling(); else stopPolling();
+    } catch { document.getElementById("list").innerHTML="<div class='no-results'>Erro ao carregar envios.</div>"; }
+  }
+
+  function startPolling(){if(!pollInterval)pollInterval=setInterval(load,2000);}
+  function stopPolling(){if(pollInterval){clearInterval(pollInterval);pollInterval=null;}}
 
   load();
 </script>

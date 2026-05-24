@@ -24,14 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * Fluxo completo de um envio:
  *   1. Utilizador carrega ficheiro → storeFile() guarda em memória e devolve fileKey
  *   2. Utilizador escolhe campanha e confirma → startDelivery() inicia o envio
- *   3. O envio corre numa thread separada para não bloquear o servidor
+ *   3. O envio corre numa thread separada para não bloquear o servidor HTTP
  *   4. A cada email enviado, o progresso é guardado na BD
- *   5. O frontend faz polling a /api/deliveries/:id para mostrar o progresso
+ *   5. O frontend faz polling a cada 2s para mostrar o progresso em tempo real
  *
- * Porquê fileStore em memória?
- *   Os destinatários não são persistidos na BD — são temporários.
- *   A fileKey é gerada quando o ficheiro é carregado e usada no envio.
- *   Simplifica o schema e garante que a lista é usada apenas uma vez.
+ * Porquê fileStore em memória e não na BD?
+ *   Os destinatários são temporários — usados uma vez e descartados.
+ *   Não persistir os dados pessoais da lista é também uma boa prática de privacidade.
  */
 public class DeliveryService {
     private static final Logger logger = LoggerFactory.getLogger(DeliveryService.class);
@@ -42,7 +41,7 @@ public class DeliveryService {
     private final FileParserService parser;
 
     // Armazenamento temporário em memória: fileKey → lista de destinatários
-    // ConcurrentHashMap é thread-safe — necessário porque várias threads podem aceder simultaneamente
+    // ConcurrentHashMap é thread-safe — várias threads podem aceder simultaneamente
     private static final Map<String, List<Recipient>> fileStore = new ConcurrentHashMap<>();
 
     public DeliveryService(Connection connection) {
@@ -55,7 +54,6 @@ public class DeliveryService {
     /**
      * Processa o ficheiro carregado e guarda os destinatários em memória.
      * Devolve uma fileKey que o frontend usa para referenciar a lista no envio.
-     * O ficheiro é guardado apenas UMA vez — bug anterior criava duas entradas.
      */
     public String storeFile(byte[] data, String fileName) {
         List<Recipient> recipients;
@@ -77,7 +75,6 @@ public class DeliveryService {
 
         String fileKey = UUID.randomUUID().toString();
         fileStore.put(fileKey, recipients);
-
         logger.info("Ficheiro '{}' processado — {} destinatários, key: {}", fileName, recipients.size(), fileKey);
         return fileKey;
     }
@@ -102,6 +99,7 @@ public class DeliveryService {
         if (recipients == null || recipients.isEmpty())
             throw new ValidationException("Ficheiro não encontrado ou já utilizado. Faz upload novamente.");
 
+        // null = envio imediato (sem agendamento)
         int deliveryId = deliveryRepo.create(userId, campaignId, recipients.size(), null);
 
         final Campaign finalCampaign = campaign;
@@ -113,9 +111,14 @@ public class DeliveryService {
     }
 
     /**
-     * Loop de envio — corre em background.
-     * A cada email tenta enviar, actualiza o progresso e aguarda 300ms
-     * para não ultrapassar os limites de envio do Gmail.
+     * Loop de envio — corre em background numa thread separada.
+     *
+     * Para cada destinatário:
+     *   1. Personaliza o assunto e corpo com as variáveis do ficheiro
+     *   2. Tenta enviar o email
+     *   3. Guarda o resultado (sucesso ou falha) na tabela delivery_logs
+     *   4. Actualiza o progresso na tabela deliveries
+     *   5. Aguarda 300ms para não ultrapassar limites do Gmail (~500/dia)
      */
     private void sendEmails(int deliveryId, Campaign campaign, List<Recipient> recipients) {
         int sent = 0, failed = 0;
@@ -128,6 +131,7 @@ public class DeliveryService {
 
         for (Recipient recipient : recipients) {
             try {
+                // Substitui {{name}}, {{email}} e qualquer variável dinâmica do ficheiro
                 String subject = personalize(campaign.getSubject(), recipient);
                 String body    = personalize(campaign.getMessage(), recipient);
 
@@ -135,17 +139,37 @@ public class DeliveryService {
                 sent++;
                 logger.info("[Delivery #{}] ✓ Enviado → {}", deliveryId, recipient.getEmail());
 
+                // Regista sucesso no log detalhado
+                try {
+                    deliveryRepo.saveLog(deliveryId, recipient.getEmail(), "sent", null, null);
+                } catch (SQLException logEx) {
+                    logger.error("Erro ao guardar log de sucesso", logEx);
+                }
+
+                // Pausa entre envios para não ultrapassar limites do Gmail
                 Thread.sleep(300);
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.warn("[Delivery #{}] Thread interrompida", deliveryId);
                 break;
+
             } catch (Exception e) {
                 failed++;
-                logger.warn("[Delivery #{}] ✗ Falhou → {} — {}", deliveryId, recipient.getEmail(), e.getMessage());
+                // Classifica o erro para mostrar diagnóstico útil no histórico
+                String errorType   = classifyError(e);
+                String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                logger.warn("[Delivery #{}] ✗ Falhou → {} — {}", deliveryId, recipient.getEmail(), errorDetail);
+
+                // Regista falha no log detalhado com tipo e detalhe do erro
+                try {
+                    deliveryRepo.saveLog(deliveryId, recipient.getEmail(), "failed", errorType, errorDetail);
+                } catch (SQLException logEx) {
+                    logger.error("Erro ao guardar log de falha", logEx);
+                }
             }
 
+            // Actualiza progresso na BD após cada email — o frontend lê isto via polling
             try {
                 deliveryRepo.updateProgress(deliveryId, sent, failed, "running");
             } catch (SQLException e) {
@@ -153,6 +177,7 @@ public class DeliveryService {
             }
         }
 
+        // Marca como concluído — "error" só se TODOS falharam
         try {
             String finalStatus = (failed == recipients.size()) ? "error" : "done";
             deliveryRepo.updateProgress(deliveryId, sent, failed, finalStatus);
@@ -164,18 +189,49 @@ public class DeliveryService {
 
     /**
      * Substitui variáveis no template pelo valor real do destinatário.
-     * Suporta {{name}}, {{email}} e qualquer coluna extra do ficheiro.
+     *
+     * Variáveis base sempre disponíveis:
+     *   {{name}}  → nome do destinatário
+     *   {{email}} → email do destinatário
+     *
+     * Variáveis dinâmicas:
+     *   Qualquer coluna extra do CSV/Excel (ex: {{empresa}}, {{cidade}})
      */
     private String personalize(String template, Recipient r) {
         String result = template
                 .replace("{{name}}",  r.getName())
                 .replace("{{email}}", r.getEmail());
 
-        // Substitui todas as variáveis dinâmicas das colunas extra do ficheiro
         for (Map.Entry<String, String> entry : r.getFields().entrySet()) {
             result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
         }
         return result;
+    }
+
+    /**
+     * Classifica o tipo de erro de envio para diagnóstico no histórico.
+     *
+     * Permite ao utilizador perceber o que correu mal e como resolver,
+     * sem precisar de interpretar mensagens técnicas do JavaMail/SMTP.
+     */
+    private String classifyError(Exception e) {
+        String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        if (msg.contains("535") || msg.contains("badcredentials") || msg.contains("username and password"))
+            return "AuthenticationFailed";
+        if (msg.contains("550") || msg.contains("user unknown") || msg.contains("does not exist"))
+            return "InvalidAddress";
+        if (msg.contains("timeout") || msg.contains("timed out"))
+            return "Timeout";
+        if (msg.contains("connection refused") || msg.contains("unable to connect"))
+            return "ConnectionRefused";
+        if (msg.contains("quota") || msg.contains("rate limit"))
+            return "RateLimitExceeded";
+        return "UnknownError";
+    }
+
+    /** Devolve os logs detalhados de um envio — emails individuais com resultado */
+    public List<DeliveryRepository.DeliveryLog> getLogs(int deliveryId) throws SQLException {
+        return deliveryRepo.findLogs(deliveryId);
     }
 
     public List<Delivery> getAll(int userId) throws SQLException {
