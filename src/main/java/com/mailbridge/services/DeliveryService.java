@@ -1,6 +1,5 @@
 package com.mailbridge.services;
 
-import com.mailbridge.exceptions.EmailConfigException;
 import com.mailbridge.exceptions.NotFoundException;
 import com.mailbridge.exceptions.ValidationException;
 import com.mailbridge.models.Campaign;
