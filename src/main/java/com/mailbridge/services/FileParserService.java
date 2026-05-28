@@ -54,7 +54,12 @@ public class FileParserService {
         List<Recipient> recipients = new ArrayList<>();
         try (CSVParser parser = CSVParser.parse(
                 new ByteArrayInputStream(data), StandardCharsets.UTF_8,
-                CSVFormat.DEFAULT.withHeader().withSkipHeaderRecord(true).withIgnoreHeaderCase().withTrim())) {
+                CSVFormat.DEFAULT.builder()
+                        .setHeader()
+                        .setSkipHeaderRecord(true)
+                        .setIgnoreHeaderCase(true)
+                        .setTrim(true)
+                        .build())) {
 
             for (CSVRecord record : parser) {
                 String email = getField(record, "email", "e-mail");
