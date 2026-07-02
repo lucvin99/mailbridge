@@ -9,26 +9,42 @@ Plataforma web para gestão e envio de campanhas de email personalizadas, desenv
 - MariaDB (base de dados)
 - Jakarta Mail (envio SMTP)
 - Apache POI (importação de ficheiros Excel)
-- Chart.js + Quill.js (interface web)
+- Chart.js
 
 ## Pré-requisitos
 
-- [Java 17 JDK](https://adoptium.net/)
+- [Java 17 JDK]([https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html)
 - [MariaDB](https://mariadb.org/download/) (versão 10.6 ou superior)
 
 ## Instalação
 
 ### 1. Base de dados
 
-Cria a base de dados com o script incluído:
+Executar o ficheiro:
 
-```sql
-mysql -u root -p < scripts/mailbridge.sql
+```text
+database/install.sql
+```
+
+#### Utilizando o HeidiSQL
+
+1. Abrir o HeidiSQL.
+2. Ligar à instância MariaDB.
+3. Selecionar **File → Run SQL file...**
+4. Escolher o ficheiro `database/install.sql`.
+5. Executar o script.
+
+#### Utilizando a linha de comandos
+
+```bash
+mysql -u root -p < database/install.sql
 ```
 
 ### 2. Configuração
 
-Edita o ficheiro `src/main/resources/db.properties`:
+Copiar o ficheiro `db.properties.example` para `db.properties` e configurar os dados da base de dados e do servidor SMTP.
+
+Exemplo:
 
 ```properties
 db.url=jdbc:mariadb://localhost:3306/mailbridge
@@ -42,7 +58,7 @@ mail.password=A_TUA_APP_PASSWORD
 mail.test_mode=true
 ```
 
-> Define `mail.test_mode=true` para testar sem enviar emails reais.
+> Define `mail.test_mode=true` para testar os envios através do Mailpit, sem enviar emails reais.
 
 ## 3. Execução da aplicação
 
@@ -76,11 +92,10 @@ http://localhost:4567
 
 A aplicação foi desenvolvida em Java 17 e pode ser executada em qualquer sistema operativo compatível com Java.
 
-* Windows: suportado através do ficheiro `iniciar.bat`.
-* Linux: suportado através do comando `java -jar`.
-* macOS: suportado através do comando `java -jar`.
+- Windows: suportado através do ficheiro `iniciar.bat`.
+- Linux: suportado através do comando `java -jar`.
+- macOS: suportado através do comando `java -jar`.
 
 O ficheiro `iniciar.bat` é apenas uma conveniência para utilizadores Windows. Os utilizadores Linux e macOS não necessitam de qualquer IDE ou do Maven, bastando executar o ficheiro JAR através da linha de comandos.
-
 
 ## Estrutura do projeto
